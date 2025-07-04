@@ -6,29 +6,27 @@ run:
   modules-download-mode: readonly
 
 linters:
-  default: false
+  default: none
   enable:
     - govet
     - errcheck
+#    - ineffassign
     - gocritic
     - bodyclose
+#    - gosec
     - prealloc
+#    - revive
     - dupl
-    # - revive
-    # - gosec
-    # - ineffassign
 
 linters-settings:
   errcheck:
     check-type-assertions: true
-    exclude-functions:
-      - 'defer .*Close'
+    exclude-functions: 'defer .*Close'
 
   gocritic:
     enabled-checks:
       - paramTypeCombine
 
-  # Включи 'revive' в линтерах, если хочешь использовать эти правила
   revive:
     rules:
       - name: indent-error-flow
@@ -54,4 +52,3 @@ exclude-rules:
 output:
   formats:
     colored-line-number: true
-
