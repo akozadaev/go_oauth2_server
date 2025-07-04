@@ -52,7 +52,4 @@ exclude-rules:
     text: "duplicated code"
 
 output:
-  formats:
-    - format: colored-line-number
-    - format: json
-
+  format: colored-line-number
