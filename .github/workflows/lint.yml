@@ -25,6 +25,5 @@ jobs:
 
       - name: Run golangci-lint
         run: |
-          tests: true
           modules-download-mode: readonly
           disable-docker: true
