@@ -4,7 +4,6 @@ run:
   timeout: 3m
   tests: true
   modules-download-mode: readonly
-  disable-docker: true
 
 linters:
   default: false
@@ -15,6 +14,9 @@ linters:
     - bodyclose
     - prealloc
     - dupl
+    # - revive
+    # - gosec
+    # - ineffassign
 
 linters-settings:
   errcheck:
@@ -26,6 +28,7 @@ linters-settings:
     enabled-checks:
       - paramTypeCombine
 
+  # Включи 'revive' в линтерах, если хочешь использовать эти правила
   revive:
     rules:
       - name: indent-error-flow
@@ -49,4 +52,6 @@ exclude-rules:
     text: "duplicated code"
 
 output:
-  format: colored-line-number
+  formats:
+    colored-line-number: true
+
