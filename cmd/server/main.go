@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"go_oauth2_server/internal/config"
 	"log/slog"
 	"net/http"
-	"oauth2-server/internal/config"
 	"os"
 	"os/signal"
 	"syscall"
@@ -33,14 +33,12 @@ func main() {
 	cfg := config.Load()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 
 	db, err := sql.Open("postgres", cfg.DatabaseURL)
 	if err != nil {
 		logger.Error("Failed to connect to database", "error", err)
 		os.Exit(1)
 	}
-	defer db.Close()
 
 	if err := db.PingContext(ctx); err != nil {
 		logger.Error("Failed to ping database", "error", err)
@@ -73,12 +71,17 @@ func main() {
 	logger.Info("Shutting down server...")
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer shutdownCancel()
 
 	if err = srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("Server forced to shutdown", "error", err)
 		os.Exit(1)
 	}
+
+	defer func(db *sql.DB) {
+		_ = db.Close()
+		cancel()
+		shutdownCancel()
+	}(db)
 
 	logger.Info("Server exited gracefully")
 }
@@ -88,7 +91,9 @@ func runMigrations(databaseURL string) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func(db *sql.DB) {
+		_ = db.Close()
+	}(db)
 
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {

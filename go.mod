@@ -1,4 +1,4 @@
-module oauth2-server
+module go_oauth2_server
 
 go 1.23.4
 

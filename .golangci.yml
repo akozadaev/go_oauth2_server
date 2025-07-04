@@ -1,0 +1,58 @@
+version: "2"
+
+run:
+  timeout: 3m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  default: false
+  enable:
+    - govet
+    - errcheck
+    - gocritic
+    - bodyclose
+    - prealloc
+    - dupl
+    # - revive
+    # - gosec
+    # - ineffassign
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    exclude-functions:
+      - 'defer .*Close'
+
+  gocritic:
+    enabled-checks:
+      - paramTypeCombine
+
+  # Включи 'revive' в линтерах, если хочешь использовать эти правила
+  revive:
+    rules:
+      - name: indent-error-flow
+        severity: error
+      - name: var-naming
+        severity: warning
+      - name: exported
+        severity: warning
+
+issues:
+  max-same-issues: 5
+  exclude-use-default: false
+  exclude:
+    - "error return value not checked.*"
+    - "should have comment or be unexported"
+    - "cyclomatic complexity"
+
+exclude-rules:
+  - linters:
+      - dupl
+    text: "duplicated code"
+
+output:
+  formats:
+    - format: colored-line-number
+    - format: json
+

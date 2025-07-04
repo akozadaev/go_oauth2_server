@@ -1,1 +1,5 @@
 .idea
+
+./go_oauth2_server
+./go_oauth2_server.zip
+./coverage.out
