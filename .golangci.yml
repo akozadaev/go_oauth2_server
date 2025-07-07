@@ -54,5 +54,4 @@ exclude-rules:
 output:
   formats:
     - format: colored-line-number
-    - format: json
 
