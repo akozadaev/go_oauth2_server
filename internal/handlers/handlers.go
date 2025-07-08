@@ -82,14 +82,14 @@ func (h *Handler) Authorize(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		var req models.AuthorizeRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			h.logger.Error("Failed to decode introspect request", "error", err)
+			h.logger.Error("Failed to decode authorize request", "error", err)
 			h.writeErrorResponse(w, "invalid_request", "Invalid request format", http.StatusBadRequest)
 			return
 		}
 
 		// Проверка обязательных полей
 		if req.ClientID == "" || req.ResponseType == "" {
-			h.writeErrorResponse(w, "invalid_request", "Token parameter is required", http.StatusBadRequest)
+			h.writeErrorResponse(w, "invalid_request", "Missing required parameters", http.StatusBadRequest)
 			return
 		}
 
@@ -123,7 +123,7 @@ func (h *Handler) Authorize(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
 	if err := h.srv.HandleTokenRequest(w, r); err != nil {
-		h.logger.Error("Ошибка при получении токена", "error", err)
+		h.logger.Error("Token request failed", "error", err)
 		// Сервер OAuth2 сам отправит корректный ответ об ошибке
 	}
 }
@@ -150,7 +150,7 @@ func (h *Handler) Introspect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// В противном случае используем стандартную валидацию через менеджер OAuth2
+	// В противном случае к стандартной валидации через OAuth2 manager
 	ti, err := h.srv.Manager.LoadAccessToken(ctx, req.Token)
 	if err != nil {
 		// Токен недействителен или просрочен
@@ -232,26 +232,37 @@ func (h *Handler) RegisterClient(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Domain      string   `json:"domain"`
 		UserID      string   `json:"user_id"`
+		Username    string   `json:"username"`
+		Password    string   `json:"password"`
 		RedirectURI []string `json:"redirect_uris,omitempty"`
 		GrantTypes  []string `json:"grant_types,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.logger.Error("Не удалось декодировать запрос на регистрацию клиента", "error", err)
+		h.logger.Error("Failed to decode client registration request", "error", err)
 		h.writeErrorResponse(w, "invalid_request", "Invalid request format", http.StatusBadRequest)
 		return
 	}
 
-	if req.Domain == "" {
-		h.writeErrorResponse(w, "invalid_request", "Domain is required", http.StatusBadRequest)
-		return
+	// Создаем пользователя, если указаны username и password
+	if req.Username != "" && req.Password != "" {
+		user := &models.User{
+			ID:        uuid.New().String(),
+			Username:  req.Username,
+			Password:  req.Password,
+			CreatedAt: time.Now(),
+		}
+
+		if err := h.store.CreateUser(ctx, user); err != nil {
+			h.logger.Error("Failed to create user", "error", err)
+			h.writeErrorResponse(w, "server_error", "Failed to create user", http.StatusInternalServerError)
+			return
+		}
+
+		req.UserID = user.ID
 	}
 
-	// Установка grant типов по умолчанию
-	if len(req.GrantTypes) == 0 {
-		req.GrantTypes = []string{"authorization_code", "client_credentials", "refresh_token"}
-	}
-
+	// Создаем клиента
 	client := &models.Client{
 		ID:        uuid.New().String(),
 		Secret:    uuid.New().String(),
@@ -270,11 +281,54 @@ func (h *Handler) RegisterClient(w http.ResponseWriter, r *http.Request) {
 		"client_id":     client.ID,
 		"client_secret": client.Secret,
 		"domain":        client.Domain,
-		"grant_types":   req.GrantTypes,
+		"user_id":       client.UserID,
 		"created_at":    client.CreatedAt.Unix(),
 	}
 
 	h.logger.Info("Client registered successfully", "client_id", client.ID, "domain", client.Domain)
+	h.writeJSONResponse(w, response, http.StatusCreated)
+}
+
+func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+		Email    string `json:"email,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("Failed to decode user registration request", "error", err)
+		h.writeErrorResponse(w, "invalid_request", "Invalid request format", http.StatusBadRequest)
+		return
+	}
+
+	if req.Username == "" || req.Password == "" {
+		h.writeErrorResponse(w, "invalid_request", "Username and password are required", http.StatusBadRequest)
+		return
+	}
+
+	user := &models.User{
+		ID:        uuid.New().String(),
+		Username:  req.Username,
+		Password:  req.Password,
+		CreatedAt: time.Now(),
+	}
+
+	if err := h.store.CreateUser(ctx, user); err != nil {
+		h.logger.Error("Failed to create user", "error", err)
+		h.writeErrorResponse(w, "server_error", "Failed to create user", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"user_id":    user.ID,
+		"username":   user.Username,
+		"created_at": user.CreatedAt.Unix(),
+	}
+
+	h.logger.Info("User registered successfully", "user_id", user.ID, "username", user.Username)
 	h.writeJSONResponse(w, response, http.StatusCreated)
 }
 
