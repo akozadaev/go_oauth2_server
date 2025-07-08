@@ -72,6 +72,7 @@ func main() {
 	router.HandleFunc("/introspect", h.Introspect).Methods("POST")
 	router.HandleFunc("/clients", h.RegisterClient).Methods("POST")
 	router.HandleFunc("/health", h.Health).Methods("GET")
+	router.HandleFunc("/users", h.RegisterUser).Methods("POST")
 
 	// Добавление middleware
 	router.Use(loggingMiddleware(logger))
