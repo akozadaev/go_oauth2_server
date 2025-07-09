@@ -4,11 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
+
 	"go_oauth2_server/internal/models"
 
 	"github.com/go-oauth2/oauth2/v4"
 	oauthModels "github.com/go-oauth2/oauth2/v4/models"
-	"github.com/go-oauth2/oauth2/v4/store"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -16,16 +17,24 @@ type PostgresStore struct {
 	db          *sql.DB
 	clientStore oauth2.ClientStore
 	tokenStore  oauth2.TokenStore
+	logger      *slog.Logger
 }
 
 func NewPostgresStore(db *sql.DB) *PostgresStore {
-	clientStore := &ClientStore{db: db}
-	tokenStore, _ := store.NewMemoryTokenStore()
+	logger := slog.Default()
+	clientStore := &ClientStore{db: db, logger: logger}
+	var tokenStore oauth2.TokenStore
+	if logger != nil { // TODO  Подумать о реализации. Пока так оставлю
+		tokenStore = NewProductionTokenStore(db, logger) // Продакшн
+	} else {
+		tokenStore = NewSimpleTokenStore(db) // Разработка
+	}
 
 	return &PostgresStore{
 		db:          db,
 		clientStore: clientStore,
 		tokenStore:  tokenStore,
+		logger:      logger,
 	}
 }
 
@@ -142,20 +151,56 @@ func (s *PostgresStore) ValidateClient(ctx context.Context, clientID, clientSecr
 	return client, nil
 }
 
+// CleanExpiredTokens очищает истекшие токены
+func (s *PostgresStore) CleanExpiredTokens(ctx context.Context) error {
+	if tokenStore, ok := s.tokenStore.(*SimpleTokenStore); ok {
+		return tokenStore.CleanExpiredTokens(ctx)
+	}
+	return nil
+}
+
+// GetTokenStats возвращает статистику токенов
+func (s *PostgresStore) GetTokenStats(ctx context.Context) (map[string]int64, error) {
+	query := `
+        SELECT 
+            COUNT(*) as total_tokens,
+            COUNT(CASE WHEN access_expires_at > NOW() THEN 1 END) as active_tokens,
+            COUNT(CASE WHEN access_expires_at <= NOW() THEN 1 END) as expired_tokens
+        FROM oauth2_tokens
+    `
+
+	var total, active, expired int64
+	err := s.db.QueryRowContext(ctx, query).Scan(&total, &active, &expired)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token stats: %w", err)
+	}
+
+	return map[string]int64{
+		"total":   total,
+		"active":  active,
+		"expired": expired,
+	}, nil
+}
+
 // ClientStore implements oauth2.ClientStore
 type ClientStore struct {
 	db      *sql.DB
 	clients map[string]oauth2.ClientInfo
+	logger  *slog.Logger
 }
 
 func (cs *ClientStore) GetByID(ctx context.Context, id string) (oauth2.ClientInfo, error) {
 	// First check in-memory cache
 	if cs.clients != nil {
 		if client, exists := cs.clients[id]; exists {
+			if cs.logger != nil {
+				cs.logger.Debug("Client found in cache", "client_id", id)
+			}
 			return client, nil
 		}
 	}
 
+	// Query database
 	client := &oauthModels.Client{}
 	query := `
         SELECT id, secret, domain, user_id
@@ -166,8 +211,16 @@ func (cs *ClientStore) GetByID(ctx context.Context, id string) (oauth2.ClientInf
 		&client.ID, &client.Secret, &client.Domain, &client.UserID,
 	)
 	if err != nil {
+		if cs.logger != nil {
+			cs.logger.Error("Failed to get client by ID", "client_id", id, "error", err)
+		}
 		return nil, fmt.Errorf("failed to get client by ID: %w", err)
 	}
+
+	if cs.logger != nil {
+		cs.logger.Debug("Client retrieved from database", "client_id", id)
+	}
+
 	return client, nil
 }
 
@@ -176,5 +229,10 @@ func (cs *ClientStore) Set(ctx context.Context, id string, client oauth2.ClientI
 		cs.clients = make(map[string]oauth2.ClientInfo)
 	}
 	cs.clients[id] = client
+
+	if cs.logger != nil {
+		cs.logger.Debug("Client cached", "client_id", id)
+	}
+
 	return nil
 }
