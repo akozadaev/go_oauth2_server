@@ -1,54 +1,95 @@
-version: "1"
-
 run:
-  timeout: 3m
+  timeout: 5m
+  issues-exit-code: 1
   tests: true
-  modules-download-mode: readonly
-
-linters:
-  default: false
-  enable:
-    - govet
-    - errcheck
-    - gocritic
-    - bodyclose
-    - prealloc
-    - dupl
-    # - revive
-    # - gosec
-    # - ineffassign
-
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-    exclude-functions:
-      - 'defer .*Close'
-
-  gocritic:
-    enabled-checks:
-      - paramTypeCombine
-
-  revive:
-    rules:
-      - name: indent-error-flow
-        severity: error
-      - name: var-naming
-        severity: warning
-      - name: exported
-        severity: warning
-
-issues:
-  max-same-issues: 5
-  exclude-use-default: false
-  exclude:
-    - "error return value not checked.*"
-    - "should have comment or be unexported"
-    - "cyclomatic complexity"
-
-exclude-rules:
-  - linters:
-      - dupl
-    text: "duplicated code"
+  skip-dirs:
+    - vendor
+    - migrations
+  skip-files:
+    - ".*_test.go"
 
 output:
   format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+
+linters-settings:
+  govet:
+    check-shadowing: true
+  golint:
+    min-confidence: 0.8
+  gocyclo:
+    min-complexity: 15
+  maligned:
+    suggest-new: true
+  dupl:
+    threshold: 100
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  misspell:
+    locale: US
+  lll:
+    line-length: 120
+  goimports:
+    local-prefixes: oauth2-server
+  gocritic:
+    enabled-tags:
+      - performance
+      - style
+      - experimental
+    disabled-checks:
+      - wrapperFunc
+
+linters:
+  enable:
+    - bodyclose
+    - deadcode
+    - depguard
+    - dogsled
+    - dupl
+    - errcheck
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - golint
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - interfacer
+    - lll
+    - misspell
+    - nakedret
+    - scopelint
+    - staticcheck
+    - structcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+    - path: cmd/
+      linters:
+        - gocyclo
+    - linters:
+        - lll
+      source: "^//go:generate "
+
+  exclude:
+    - "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*printf?|os\\.(Un)?Setenv). is not checked"
+    - "exported (type|method|function) (.+) should have comment or be unexported"
