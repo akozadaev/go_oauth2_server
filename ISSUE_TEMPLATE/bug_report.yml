@@ -1,0 +1,73 @@
+name: Отчет об ошибке
+description: Сообщите об ошибке, чтобы помочь нам улучшить проект
+title: "[ОШИБКА] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо, что нашли время заполнить этот отчет об ошибке!
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Что произошло?
+      description: Ясное и краткое описание ошибки.
+      placeholder: Расскажите нам, что вы видите!
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемое поведение
+      description: Что вы ожидали увидеть?
+      placeholder: Расскажите нам, что вы ожидали!
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги для воспроизведения
+      description: Шаги для воспроизведения поведения
+      placeholder: |
+        1. Перейдите к '...'
+        2. Нажмите на '....'
+        3. Прокрутите вниз до '....'
+        4. Увидьте ошибку
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Соответствующий вывод логов
+      description: Пожалуйста, скопируйте и вставьте любой соответствующий вывод логов.
+      render: shell
+
+  - type: dropdown
+    id: version
+    attributes:
+      label: Версия
+      description: Какую версию OAuth2 Сервера вы используете?
+      options:
+        - main (последняя)
+        - v1.0.0
+        - v0.9.0
+        - Другая (пожалуйста, укажите в описании)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Окружение
+      description: Какое окружение вы используете?
+      options:
+        - Docker
+        - Локальная разработка
+        - Продакшн
+        - Другое (пожалуйста, укажите)
+    validations:
+      required: true
