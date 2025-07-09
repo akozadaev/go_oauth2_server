@@ -442,3 +442,7 @@ curl -X POST http://localhost:8080/token \
 ```json
 {"time":"2025-07-08T09:50:21.922219294+03:00","level":"INFO","msg":"Request processed","method":"POST","path":"/token","status":200,"duration":131809,"ip":"[::1]:57390","user_agent":"PostmanRuntime/7.44.1"}
 ```
+## Проверка работоспособности, вспомогательные инструменты администирования
+
+1. Установите прав на выполнение для скриптов
+chmod +x scripts/*.sh

@@ -1,5 +1,63 @@
-.idea
+# Git
+.git
+.gitignore
 
-./go_oauth2_server
-./go_oauth2_server.zip
-./coverage.out
+# Documentation
+README.md
+*.md
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.example
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+go_oauth2_server
+go_oauth2_server.zip
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test files
+*.test
+coverage.out
+*.out
+
+# Vendor (пересоздастся в в Docker)
+vendor/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Scripts
+scripts/
+
+# Config files
+.golangci.yml
+Makefile
+
+# Backup files
+*.bak
+*.backup
