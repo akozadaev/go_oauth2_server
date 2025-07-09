@@ -1,5 +1,5 @@
 # Makefile для OAuth2 сервера
-.PHONY: help tools generate build release fmt test test-coverage lint-full lint-fix check clean-all clean-deps clean-deps-safe fix-network vendor stop-conflicts docker-build docker-build-debug docker-build-simple docker-build-offline up up-debug up-simple up-no-build down logs logs-server logs-db logs-redis status restart restart-server check-ports shell db-shell redis-shell docker-test diagnose diagnose-container health quick-start debug
+.PHONY: help tools generate build release fmt test test-coverage lint-full lint-fix check clean-all clean-deps clean-deps-safe fix-network vendor stop-conflicts docker-build docker-build-debug docker-build-simple docker-build-offline up up-debug up-simple up-no-build down logs logs-server logs-db logs-redis logs-fixed status restart restart-server check-ports shell db-shell redis-shell shell-fixed docker-test diagnose diagnose-container health quick-start quick-start-simple quick-start-fixed debug dev clean-tokens show-tokens count-tokens
 
 # ==================== РАЗРАБОТКА ====================
 
@@ -238,6 +238,33 @@ health: ## 🏥 Проверить health endpoint
 	@echo "🏥 Проверка health endpoint:"
 	@curl -s http://localhost:8080/health | jq . || curl -s http://localhost:8080/health || echo "❌ Health endpoint недоступен"
 
+# ==================== ТОКЕНЫ ====================
+
+clean-tokens: ## 🧹 Очистить истекшие токены
+	@echo "🧹 Очистка истекших токенов..."
+	@chmod +x scripts/cleanup-tokens.sh
+	@./scripts/cleanup-tokens.sh
+
+show-tokens: ## 📊 Показать активные токены
+	@echo "📊 Активные токены:"
+	@docker-compose exec postgres psql -U oauth2_user -d oauth2_db -c "\
+		SELECT client_id, user_id, scope, \
+		       access_expires_at, refresh_expires_at, \
+		       created_at \
+		FROM oauth2_tokens \
+		WHERE access_expires_at > NOW() \
+		ORDER BY created_at DESC \
+		LIMIT 10;"
+
+count-tokens: ## 📈 Подсчет токенов
+	@echo "📈 Статистика токенов:"
+	@docker-compose exec postgres psql -U oauth2_user -d oauth2_db -c "\
+		SELECT \
+		    COUNT(*) as total_tokens, \
+		    COUNT(CASE WHEN access_expires_at > NOW() THEN 1 END) as active_tokens, \
+		    COUNT(CASE WHEN access_expires_at <= NOW() THEN 1 END) as expired_tokens \
+		FROM oauth2_tokens;"
+
 # ==================== БЫСТРЫЕ КОМАНДЫ ====================
 
 quick-start: ## 🚀 Быстрый старт
@@ -299,11 +326,13 @@ help: ## 📚 Показать справку
 	@echo "🐳 DOCKER:"
 	@grep -E '^[a-zA-Z_-]+:.*?## 🧹|^[a-zA-Z_-]+:.*?## 🛑|^[a-zA-Z_-]+:.*?## 🔨|^[a-zA-Z_-]+:.*?## 🚀|^[a-zA-Z_-]+:.*?## ⏹️|^[a-zA-Z_-]+:.*?## 📋|^[a-zA-Z_-]+:.*?## 📊|^[a-zA-Z_-]+:.*?## 🔄|^[a-zA-Z_-]+:.*?## 🔌|^[a-zA-Z_-]+:.*?## 🐚|^[a-zA-Z_-]+:.*?## 🔍|^[a-zA-Z_-]+:.*?## 🏥' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
+	@echo "🔑 ТО��ЕНЫ:"
+	@grep -E '^[a-zA-Z_-]+:.*?## 🧹|^[a-zA-Z_-]+:.*?## 📊|^[a-zA-Z_-]+:.*?## 📈' $(MAKEFILE_LIST) | grep -E 'tokens|clean-tokens|show-tokens|count-tokens' | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
 	@echo "⚡ БЫСТРЫЕ КОМАНДЫ:"
 	@grep -E '^[a-zA-Z_-]+:.*?## 🚀|^[a-zA-Z_-]+:.*?## 🐛|^[a-zA-Z_-]+:.*?## 👨‍💻|^[a-zA-Z_-]+:.*?## 📚' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Примеры использования:"
-	@echo "  make quick-start-simple  # Простая версия для отладки"
-	@echo "  make diagnose-container  # Детальная диагностика контейнера"
-	@echo "  make logs-server         # Логи OAuth2 сервера"
-	@echo "  make dev                 # Локальная разработка"
+	@echo "  make show-tokens     # Показать активные токены"
+	@echo "  make clean-tokens    # Очистить истекшие токены"
+	@echo "  make count-tokens    # Статистика токенов"
