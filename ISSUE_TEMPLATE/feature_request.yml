@@ -1,0 +1,49 @@
+name: Запрос функции
+description: Предложите идею для OAuth2 Сервера
+title: "[ФУНКЦИЯ] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за предложение новой функции!
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Описание проблемы
+      description: Связан ли ваш запрос функции с проблемой? Пожалуйста, опишите.
+      placeholder: Ясное и краткое описание проблемы.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Предлагаемое решение
+      description: Опишите решение, которое вы хотели бы видеть
+      placeholder: Ясное и краткое описание того, что вы хотите, чтобы произошло.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Рассмотренные альтернативы
+      description: Опишите альтернативы, которые вы рассматривали
+      placeholder: Ясное и краткое описание любых альтернативных решений.
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Дополнительный контекст
+      description: Добавьте любой другой контекст или скриншоты о запросе функции здесь.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Участие
+      description: Готовы ли вы внести вклад в эту функцию?
+      options:
+        - label: Я готов реализовать эту функцию
+          required: false

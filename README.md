@@ -1,8 +1,10 @@
 # OAuth2 Server
 
-![Go](https://img.shields.io/badge/Go-1.23-blue.svg)
-![Build](https://github.com/akozadaev/go_shortiner/actions/workflows/lint.yml/badge.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+[![Go Version](https://img.shields.io/badge/Go-1.23.4-blue.svg)](https://golang.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)]([LICENSE](LICENSE))
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)]([Dockerfile](Dockerfile))
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://postgresql.org/)
+[![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](#)
 
 OAuth2 сервер на Go 1.23.4, на базе PostgreSQL
 
@@ -245,7 +247,7 @@ oauth2-server/
 
 ```json
 {
-  "time": "2024-01-15T10:30:45.123Z",
+  "time": "2025-01-15T10:30:45.123Z",
   "level": "INFO",
   "msg": "Request processed",
   "method": "POST",
