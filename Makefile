@@ -95,6 +95,11 @@ docker-build-simple: clean-all ## 🔨 Собрать простые Docker об
 	docker-compose -f docker-compose.simple.yml build --no-cache --force-rm
 	@echo "✅ Простые Docker образы собраны"
 
+docker-build-fixed: clean-all clean-deps ## 🔨 Собрать исправленные Docker образы
+	@echo "🔨 Сборка исправленных Docker образов..."
+	docker build -f Dockerfile.fixed -t oauth2-server:fixed --no-cache .
+	@echo "✅ Исправленные Docker образы собраны"
+
 up: stop-conflicts docker-build ## 🚀 Запустить все сервисы
 	@echo "🚀 Запуск сервисов..."
 	docker-compose up -d
@@ -125,6 +130,23 @@ up-simple: stop-conflicts docker-build-simple ## 🚀 Запустить про�
 	@echo "🔍 Проверка health endpoint:"
 	@curl -s http://localhost:8080/health || echo "❌ Health endpoint недоступен"
 
+up-fixed: stop-conflicts docker-build-fixed ## 🚀 Запустить исправленную версию
+	@echo "🚀 Запуск исправленной версии сервисов..."
+	docker run -d --name oauth2-server-fixed \
+		-p 8080:8080 \
+		-e PORT=8080 \
+		-e DATABASE_URL="postgres://oauth2_user:oauth2_password@host.docker.internal:5433/oauth2_db?sslmode=disable" \
+		-e JWT_SECRET="your-super-secret-jwt-key-change-this-in-production-make-it-at-least-32-characters-long" \
+		-e LOG_LEVEL=debug \
+		oauth2-server:fixed
+	@echo "⏳ Ожидание готовности сервиса (20 секунд)..."
+	@sleep 20
+	@echo "📋 Логи исправленной версии:"
+	@docker logs oauth2-server-fixed
+	@echo ""
+	@echo "🔍 Проверка health endpoint:"
+	@curl -s http://localhost:8080/health || echo "❌ Health endpoint недоступен"
+
 up-no-build: stop-conflicts ## 🚀 Запустить без пересборки
 	@echo "🚀 Запуск сервисов без пересборки..."
 	docker-compose up -d
@@ -150,6 +172,9 @@ logs-db: ## 📋 Показать логи PostgreSQL
 
 logs-redis: ## 📋 Показать логи Redis
 	docker-compose logs -f redis
+
+logs-fixed: ## 📋 Показать логи исправленной версии
+	docker logs -f oauth2-server-fixed
 
 status: ## 📊 Показать статус сервисов
 	@echo "📊 Статус сервисов:"
@@ -187,6 +212,9 @@ db-shell: ## 🐚 Подключиться к PostgreSQL
 
 redis-shell: ## 🐚 Подключиться к Redis
 	docker-compose exec redis redis-cli -a redis_password
+
+shell-fixed: ## 🐚 Подключиться к исправленной версии
+	docker exec -it oauth2-server-fixed sh
 
 docker-test: ## 🧪 Запустить тесты в Docker
 	docker-compose exec oauth2-server go test ./... -v
@@ -235,6 +263,14 @@ quick-start-simple: ## 🚀 Быстрый старт простой верси�
 	@echo "   OAuth2 Server: http://localhost:8080"
 	@echo "   PostgreSQL:    localhost:5433"
 	@echo "   Redis:         localhost:6380"
+
+quick-start-fixed: ## 🚀 Быстрый старт исправленной версии
+	@echo "🚀 Быстрый старт исправленной версии OAuth2 сервера..."
+	@make up-fixed
+	@echo ""
+	@echo "🌐 Доступные URL:"
+	@echo "   OAuth2 Server: http://localhost:8080"
+	@echo "   Health Check:  http://localhost:8080/health"
 
 debug: ## 🐛 Режим отладки
 	@echo "🐛 Запуск в режиме отладки..."
