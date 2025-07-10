@@ -12,7 +12,7 @@ issues:
 
 output:
   formats:
-    - colored-line-number
+    - format: colored-line-number
 
 linters:
   enable:
@@ -23,18 +23,17 @@ linters:
     - gosimple
     - unused
     - typecheck
-#    - structcheck
-#    - deadcode
+    #    - structcheck
+    #    - deadcode
     - gocritic
     - gofmt
-    - goimports
+#    - goimports
     - bodyclose
-#    - exportloopref
+  #    - exportloopref
   disable:
-    - interfacer
-#    - scopelint
-#    - golint
-#    - varcheck
+    #    - scopelint
+    #    - golint
+    #    - varcheck
     - depguard
 
 linters-settings:
@@ -43,4 +42,5 @@ linters-settings:
     rules:
       - name: indent-error-flow
       - name: var-naming
-        arguments: [ "camelCase" ]
+        arguments: [ [ "API", "ASCII", "CPU", "CSS", "DNS", "EOF", "GUID", "HTML", "HTTP", "HTTPS", "ID", "IP", "JSON", "QPS", "RAM", "RPC", "SLA", "SMTP", "SQL", "SSH", "TCP", "TLS", "TTL", "UDP", "UI", "UID", "UUID", "URI", "URL", "UTF8", "VM", "XML", "XSRF", "XSS" ] ]
+
