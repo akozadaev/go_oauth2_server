@@ -1,3 +1,6 @@
+//go:build !debug
+
+// main.go
 package main
 
 import (

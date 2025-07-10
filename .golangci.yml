@@ -1,95 +1,46 @@
 run:
   timeout: 5m
-  issues-exit-code: 1
   tests: true
-  skip-dirs:
-    - vendor
-    - migrations
-  skip-files:
+  concurrency: 4
+
+issues:
+  exclude-files:
+    - ".*.gen.go"
     - ".*_test.go"
+  exclude-dirs:
+    - "migrations"
 
 output:
-  format: colored-line-number
-  print-issued-lines: true
-  print-linter-name: true
-
-linters-settings:
-  govet:
-    check-shadowing: true
-  golint:
-    min-confidence: 0.8
-  gocyclo:
-    min-complexity: 15
-  maligned:
-    suggest-new: true
-  dupl:
-    threshold: 100
-  goconst:
-    min-len: 3
-    min-occurrences: 3
-  misspell:
-    locale: US
-  lll:
-    line-length: 120
-  goimports:
-    local-prefixes: oauth2-server
-  gocritic:
-    enabled-tags:
-      - performance
-      - style
-      - experimental
-    disabled-checks:
-      - wrapperFunc
+  formats:
+    - colored-line-number
 
 linters:
   enable:
-    - bodyclose
-    - deadcode
-    - depguard
-    - dogsled
-    - dupl
+    - govet
+    - revive
     - errcheck
-    - gochecknoinits
-    - goconst
+    - staticcheck
+    - gosimple
+    - unused
+    - typecheck
+#    - structcheck
+#    - deadcode
     - gocritic
-    - gocyclo
     - gofmt
     - goimports
-    - golint
-    - gosec
-    - gosimple
-    - govet
-    - ineffassign
+    - bodyclose
+#    - exportloopref
+  disable:
     - interfacer
-    - lll
-    - misspell
-    - nakedret
-    - scopelint
-    - staticcheck
-    - structcheck
-    - stylecheck
-    - typecheck
-    - unconvert
-    - unparam
-    - unused
-    - varcheck
-    - whitespace
+#    - scopelint
+#    - golint
+#    - varcheck
+    - depguard
 
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gocyclo
-        - errcheck
-        - dupl
-        - gosec
-    - path: cmd/
-      linters:
-        - gocyclo
-    - linters:
-        - lll
-      source: "^//go:generate "
-
-  exclude:
-    - "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*printf?|os\\.(Un)?Setenv). is not checked"
-    - "exported (type|method|function) (.+) should have comment or be unexported"
+linters-settings:
+  revive:
+    severity: warning
+    rules:
+      - name: indent-error-flow
+      - name: var-naming
+        arguments: [ "camelCase" ]
