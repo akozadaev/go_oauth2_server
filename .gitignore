@@ -10,7 +10,7 @@
 .env
 .env.local
 .env.production
-.env.example
+#.env.example
 
 # IDE
 .vscode
@@ -52,7 +52,7 @@ docker-compose*.yml
 .dockerignore
 
 # Scripts
-scripts/
+#scripts/
 
 # Config files
 .golangci.yml

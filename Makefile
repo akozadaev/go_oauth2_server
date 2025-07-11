@@ -238,6 +238,10 @@ health: ## 🏥 Проверить health endpoint
 	@echo "🏥 Проверка health endpoint:"
 	@curl -s http://localhost:8080/health | jq . || curl -s http://localhost:8080/health || echo "❌ Health endpoint недоступен"
 
+doc: ## 📚 Генерация Swagger-документации
+	go install github.com/swaggo/swag/cmd/swag@latest
+	swag init -g cmd/server/main.go --dir . --pd --parseGoList=false --parseDepth=2 -o ./docs
+
 # ==================== ТОКЕНЫ ====================
 
 clean-tokens: ## 🧹 Очистить истекшие токены
