@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # OAuth2 Server
+  oauth2-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: oauth2-server
+    restart: unless-stopped
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgres://oauth2_user:oauth2_password@postgres:5432oauth2_db?sslmode=disable
+      JWT_SECRET: your-super-secret-jwt-key-change-this-in-production-make-it-at-least-32-characters-long
+      TOKEN_EXPIRATION_MINUTES: 60
+      REFRESH_EXPIRATION_HOURS: 168
+      LOG_LEVEL: debug
+    ports:
+      - "8080:8080"
+    networks:
+      - oauth2-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: oauth2-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: oauth2_db
+      POSTGRES_USER: oauth2_user
+      POSTGRES_PASSWORD: oauth2_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "5433:5432"
+    networks:
+      - oauth2-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oauth2_user -d oauth2_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: oauth2-redis
+    restart: unless-stopped
+    command: redis-server --requirepass redis_password --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6380:6379"
+    networks:
+      - oauth2-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_password", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+   # Adminer для управления БД
+  adminer:
+    image: adminer:latest
+    container_name: oauth2-adminer
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    networks:
+      - oauth2-network
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    profiles:
+      - dev
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  oauth2-network:
+    driver: bridge
