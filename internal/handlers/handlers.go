@@ -89,10 +89,10 @@ func New(store *storage.PostgresStore, logger *slog.Logger, cfg *config.Config) 
 //   \"error_description\": \"Missing parameters\"
 // }"
 // @Failure 401 {object} map[string]string "Ошибка авторизации:
-//{
-//\"error\": \"access_denied\",
-//\"error_description\": \"Invalid credentials\"
-//}"
+// {
+// \"error\": \"access_denied\",
+// \"error_description\": \"Invalid credentials\"
+// }"
 // @Router /authorize [get]
 
 // AuthorizePost godoc
