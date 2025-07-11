@@ -375,7 +375,7 @@ curl --location 'http://localhost:8080/introspect' \
 {
     "active": true,
     "client_id": "e7fb9eea-11e8-4ac7-9789-8e5903ba9472",
-    "username": "b4fa6ac1-9f48-4f33-be7c-fb98a3cd84e2",
+    "user_id": "b4fa6ac1-9f48-4f33-be7c-fb98a3cd84e2",
     "exp": 1751963287
 }
 ```

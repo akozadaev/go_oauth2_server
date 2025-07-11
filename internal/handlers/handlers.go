@@ -171,7 +171,7 @@ func (h *Handler) Introspect(w http.ResponseWriter, r *http.Request) {
 	response := models.IntrospectResponse{
 		Active:   true,
 		ClientID: ti.GetClientID(),
-		Username: ti.GetUserID(),
+		UserID:   ti.GetUserID(),
 		Scope:    ti.GetScope(),
 		Exp:      expiresAt.Unix(),
 	}
@@ -220,7 +220,7 @@ func (h *Handler) validateJWTToken(tokenString string) models.IntrospectResponse
 	return models.IntrospectResponse{
 		Active:   true,
 		ClientID: clientID,
-		Username: username,
+		UserID:   username,
 		Scope:    "", // Сейчас не используем
 		Exp:      int64(exp),
 	}
