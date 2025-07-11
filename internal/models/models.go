@@ -57,7 +57,7 @@ type IntrospectRequest struct {
 type IntrospectResponse struct {
 	Active   bool   `json:"active"`
 	ClientID string `json:"client_id,omitempty"`
-	Username string `json:"username,omitempty"`
+	UserID   string `json:"user_id,omitempty"`
 	Scope    string `json:"scope,omitempty"`
 	Exp      int64  `json:"exp,omitempty"`
 }
