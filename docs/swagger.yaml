@@ -1,0 +1,56 @@
+info:
+  contact: {}
+paths:
+  /authorize:
+    post:
+      consumes:
+      - application/json
+      description: Авторизация пользователя с передачей формы
+      produces:
+      - text/html
+      responses:
+        "400":
+          description: 'Неверный запрос. Пример:'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'Ошибка авторизации:'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Авторизация (POST)
+      tags:
+      - authorize
+  /token:
+    post:
+      consumes:
+      - application/json
+      description: АОбмен кода на токен
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'Неверный запрос. Пример:'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'Ошибка авторизации:'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обмен кода на токен
+      tags:
+      - token
+swagger: "2.0"

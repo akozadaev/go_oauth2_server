@@ -76,6 +76,44 @@ func New(store *storage.PostgresStore, logger *slog.Logger, cfg *config.Config) 
 	}
 }
 
+// AuthorizeGet godoc
+// @Summary Авторизация (GET)
+// @Description Авторизация пользователя (через браузер)
+// @Tags authorize
+// @Accept json
+// @Produce html
+// @Success 200 {string} string "HTML-форма"
+// @Failure 400 {object} map[string]string "Неверный запрос. Пример:
+// {
+//   \"error\": \"invalid_request\",
+//   \"error_description\": \"Missing parameters\"
+// }"
+// @Failure 401 {object} map[string]string "Ошибка авторизации:
+//{
+//\"error\": \"access_denied\",
+//\"error_description\": \"Invalid credentials\"
+//}"
+// @Router /authorize [get]
+
+// AuthorizePost godoc
+// @Summary Авторизация (POST)
+// @Description Авторизация пользователя с передачей формы
+// @Tags authorize
+// @Accept json
+// @Produce html
+// @Failure 400 {object} map[string]string "Неверный запрос. Пример:
+//
+//	{
+//	  \"error\": \"invalid_request\",
+//	  \"error_description\": \"Missing parameters\"
+//	}"
+//
+// @Failure 401 {object} map[string]string "Ошибка авторизации:
+// {
+// \"error\": \"access_denied\",
+// \"error_description\": \"Invalid credentials\"
+// }"
+// @Router /authorize [post]
 func (h *Handler) Authorize(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -121,6 +159,31 @@ func (h *Handler) Authorize(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Token godoc
+// @Summary Обмен кода на токен
+// @Description АОбмен кода на токен
+// @Tags token
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]string
+//
+//	  \"error\": \"invalid_request\",
+//	  \"error_description\": \"Missing parameters\"
+//	}" "Успешный ответ с полной информацией о добавленных ссылках"
+//
+// @Failure 400 {object} map[string]string "Неверный запрос. Пример:
+//
+//	{
+//	  \"error\": \"invalid_request\",
+//	  \"error_description\": \"Missing parameters\"
+//	}"
+//
+// @Failure 401 {object} map[string]string "Ошибка авторизации:
+// {
+// \"error\": \"access_denied\",
+// \"error_description\": \"Invalid credentials\"
+// }"
+// @Router /token [post]
 func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
 	if err := h.srv.HandleTokenRequest(w, r); err != nil {
 		h.logger.Error("Token request failed", "error", err)

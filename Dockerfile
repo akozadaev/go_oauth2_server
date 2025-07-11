@@ -4,7 +4,7 @@ FROM golang:1.23.4-alpine AS builder
 # Устанавливаем необходимые пакеты
 RUN apk add --no-cache git ca-certificates tzdata
 
-# Создаем пользователя
+# Создаем пользователя без root-доступа
 RUN adduser -D -g '' appuser
 
 # Рабочая директория
@@ -20,15 +20,13 @@ RUN go mod download && go mod verify
 COPY . .
 
 # Очищаем vendor если есть и пересоздаем
-RUN rm -rf vendor/ && go mod tidy
+RUN rm -rf vendor && go mod tidy
 
-# Собираем приложение с -mod=readonly для избежания проблем с vendor
+# Собираем приложение с -mod=readonly для избежания проблем с vendorприложения
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -mod=readonly \
-    -ldflags='-w -s -extldflags "-static"' \
-    -a -installsuffix cgo \
-    -o oauth2-server \
-    cmd/server/main.go
+    -ldflags='-w -s' \
+    -o oauth2-server ./cmd/server/main.go
 
 # Финальный образ
 FROM alpine:latest
@@ -36,7 +34,7 @@ FROM alpine:latest
 # Устанавливаем curl для health check
 RUN apk --no-cache add ca-certificates curl
 
-# Импортируем пользователя из builder
+# Добавляем непривилегированного пользователя
 COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/group /etc/group
 
@@ -47,13 +45,11 @@ WORKDIR /app
 COPY --from=builder /build/oauth2-server .
 COPY --from=builder /build/migrations ./migrations
 
-# Делаем бинарник исполняемым
-RUN chmod +x oauth2-server
+# Права на исполняемый файл и директории
+RUN chmod +x oauth2-server && \
+    chown -R appuser:appuser /app
 
-# Создаем директории для логов
-RUN mkdir -p /app/logs && chown appuser:appuser /app/logs
-
-# Используем непривилегированного пользователя
+# Устанавливаем пользователя
 USER appuser
 
 # Открываем порт
@@ -63,5 +59,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-# Запуск приложения
+# Запускаем приложение (с миграциями внутри)
 CMD ["./oauth2-server"]
