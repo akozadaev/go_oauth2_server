@@ -24,7 +24,52 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+var (
+	httpRequestsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_requests_total",
+			Help: "Total number of HTTP requests",
+		},
+		[]string{"method", "endpoint", "status"},
+	)
+
+	httpRequestDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "http_request_duration_seconds",
+			Help:    "HTTP request duration in seconds",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"method", "endpoint"},
+	)
+
+	oauth2TokensIssued = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "oauth2_tokens_issued_total",
+			Help: "Total number of OAuth2 tokens issued",
+		},
+		[]string{"grant_type"},
+	)
+
+	oauth2TokensValidated = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "oauth2_tokens_validated_total",
+			Help: "Total number of OAuth2 tokens validated",
+		},
+		[]string{"valid"},
+	)
+)
+
+func init() {
+	// Регистрируем метрики
+	prometheus.MustRegister(httpRequestsTotal)
+	prometheus.MustRegister(httpRequestDuration)
+	prometheus.MustRegister(oauth2TokensIssued)
+	prometheus.MustRegister(oauth2TokensValidated)
+}
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
@@ -76,8 +121,12 @@ func main() {
 	router.HandleFunc("/health", h.Health).Methods("GET")
 	router.HandleFunc("/users", h.RegisterUser).Methods("POST")
 
+	// Prometheus метрики
+	router.Handle("/metrics", promhttp.Handler()).Methods("GET")
+
 	router.Use(loggingMiddleware(logger))
 	router.Use(corsMiddleware)
+	router.Use(metricsMiddleware)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -169,6 +218,21 @@ func loggingMiddleware(logger *slog.Logger) mux.MiddlewareFunc {
 			)
 		})
 	}
+}
+
+func metricsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+
+		next.ServeHTTP(wrapped, r)
+
+		duration := time.Since(start).Seconds()
+
+		// Метрики запросов
+		httpRequestsTotal.WithLabelValues(r.Method, r.URL.Path, fmt.Sprintf("%d", wrapped.statusCode)).Inc()
+		httpRequestDuration.WithLabelValues(r.Method, r.URL.Path).Observe(duration)
+	})
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
