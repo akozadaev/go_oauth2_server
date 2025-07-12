@@ -72,6 +72,13 @@ func init() {
 }
 
 func main() {
+	err := run()
+	if err != nil {
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
@@ -86,7 +93,7 @@ func main() {
 	// Ожидание готовности БД до открытия соединения ()
 	if err := waitForDB(cfg.DatabaseURL); err != nil {
 		logger.Error("Database not ready", "error", err)
-		os.Exit(1)
+		return err
 	}
 
 	// Подключение к базе данных с таймаутом
@@ -96,18 +103,18 @@ func main() {
 	db, err := sql.Open("postgres", cfg.DatabaseURL)
 	if err != nil {
 		logger.Error("Failed to connect to database", "error", err)
-		os.Exit(1)
+		return err
 	}
 	defer db.Close()
 
 	if err := db.PingContext(ctx); err != nil {
 		logger.Error("Failed to ping database", "error", err)
-		os.Exit(1)
+		return err
 	}
 
 	if err := runMigrations(cfg.DatabaseURL); err != nil {
 		logger.Error("Failed to run migrations", "error", err)
-		os.Exit(1)
+		return err
 	}
 
 	store := storage.NewPostgresStore(db)
@@ -154,10 +161,11 @@ func main() {
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("Server forced to shutdown", "error", err)
-		os.Exit(1)
+		return err
 	}
 
 	logger.Info("Server exited gracefully")
+	return nil
 }
 
 func waitForDB(databaseURL string) error {
