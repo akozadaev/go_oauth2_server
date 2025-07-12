@@ -8,11 +8,15 @@ scrape_configs:
       - targets: [ 'oauth2-server:8080' ]
     metrics_path: '/metrics'
     scrape_interval: 10s
+    scrape_timeout: 5s
 
   - job_name: 'postgres'
     static_configs:
       - targets: [ 'postgres:5432' ]
+    scrape_interval: 30s
+    scrape_timeout: 10s
 
-  - job_name: 'redis'
+  - job_name: 'prometheus'
     static_configs:
-      - targets: [ 'redis:6379' ]
+      - targets: [ 'localhost:9090' ]
+    scrape_interval: 15s
