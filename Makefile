@@ -1,5 +1,5 @@
 # Makefile для OAuth2 сервера
-.PHONY: help tools generate build release fmt test test-coverage lint-full lint-fix check clean-all clean-deps clean-deps-safe fix-network vendor stop-conflicts docker-build docker-build-debug docker-build-simple docker-build-offline up up-debug up-simple up-no-build down logs logs-server logs-db logs-redis logs-fixed status restart restart-server check-ports shell db-shell redis-shell shell-fixed docker-test diagnose diagnose-container health quick-start quick-start-simple quick-start-fixed debug dev clean-tokens show-tokens count-tokens
+.PHONY: help tools generate build release fmt test test-coverage lint-full lint-fix check clean-all clean-deps clean-deps-safe fix-network vendor stop-conflicts docker-build docker-build-simple docker-build-offline up up-simple up-no-build down logs logs-server logs-db logs-redis logs-fixed status restart restart-server check-ports shell db-shell redis-shell shell-fixed docker-test diagnose diagnose-container health quick-start quick-start-simple quick-start-fixed debug dev clean-tokens show-tokens count-tokens
 
 # ==================== РАЗРАБОТКА ====================
 
@@ -64,7 +64,6 @@ vendor: ## 📦 Создание vendor директории
 clean-all: ## 🧹 Полная очистка Docker
 	@echo "🧹 Полная очистка Docker..."
 	-docker-compose down -v --remove-orphans 2>/dev/null || true
-	-docker-compose -f docker-compose.debug.yml down -v --remove-orphans 2>/dev/null || true
 	-docker-compose -f docker-compose.simple.yml down -v --remove-orphans 2>/dev/null || true
 	-docker container prune -f
 	-docker volume prune -f
@@ -85,10 +84,7 @@ docker-build: clean-all clean-deps ## 🔨 Собрать Docker образы з
 	docker-compose build --no-cache --force-rm
 	@echo "✅ Docker образы собраны"
 
-docker-build-debug: clean-all clean-deps ## 🔨 Собрать Docker образы для отладки
-	@echo "🔨 Сборка Docker образов для отладки..."
-	docker-compose -f docker-compose.debug.yml build --no-cache --force-rm
-	@echo "✅ Docker образы для отладки собраны"
+
 
 docker-build-simple: clean-all ## 🔨 Собрать простые Docker образы
 	@echo "🔨 Сборка простых Docker образов..."
@@ -108,16 +104,7 @@ up: stop-conflicts docker-build ## 🚀 Запустить все сервисы
 	@make status
 	@echo "✅ Сервисы запущены"
 
-up-debug: stop-conflicts docker-build-debug ## 🚀 Запустить в режиме отладки
-	@echo "🚀 Запуск сервисов в режиме отладки..."
-	docker-compose -f docker-compose.debug.yml up -d
-	@echo "⏳ Ожидание готовности сервисов (30 секунд)..."
-	@sleep 30
-	@echo "📋 Логи OAuth2 сервера:"
-	@docker-compose -f docker-compose.debug.yml logs oauth2-server
-	@echo ""
-	@echo "🔍 Запуск диагностики..."
-	@make diagnose-debug
+
 
 up-simple: stop-conflicts docker-build-simple ## 🚀 Запустить простую версию
 	@echo "🚀 Запуск простой версии сервисов..."
@@ -157,7 +144,6 @@ up-no-build: stop-conflicts ## 🚀 Запустить без пересборк
 down: ## ⏹️ Остановить все сервисы
 	@echo "⏹️  Остановка сервисов..."
 	docker-compose down
-	docker-compose -f docker-compose.debug.yml down
 	docker-compose -f docker-compose.simple.yml down
 	@echo "✅ Сервисы остановлены"
 
@@ -227,12 +213,7 @@ diagnose-container: ## 🔍 Детальная диагностика конте
 	@chmod +x scripts/container-debug.sh
 	@./scripts/container-debug.sh
 
-diagnose-debug: ## 🔍 Диагностика debug версии
-	@echo "🔍 Диагностика debug версии..."
-	@docker-compose -f docker-compose.debug.yml ps
-	@echo ""
-	@echo "📋 Логи OAuth2 Server (debug):"
-	@docker-compose -f docker-compose.debug.yml logs --tail=50 oauth2-server
+
 
 health: ## 🏥 Проверить health endpoint
 	@echo "🏥 Проверка health endpoint:"
