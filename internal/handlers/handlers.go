@@ -411,7 +411,7 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	h.writeJSONResponse(w, map[string]interface{}{
 		"status":    "healthy",
 		"timestamp": time.Now().Unix(),
-		"version":   "1.0.0",
+		"version":   "1.1.1",
 	}, http.StatusOK)
 }
 

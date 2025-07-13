@@ -31,8 +31,8 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
 # Финальный образ
 FROM alpine:latest
 
-# Устанавливаем curl для health check
-RUN apk --no-cache add ca-certificates curl
+# Устанавливаем wget для health check
+RUN apk --no-cache add ca-certificates wget
 
 # Добавляем непривилегированного пользователя
 COPY --from=builder /etc/passwd /etc/passwd
@@ -57,7 +57,7 @@ EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Запускаем приложение (с миграциями внутри)
 CMD ["./oauth2-server"]

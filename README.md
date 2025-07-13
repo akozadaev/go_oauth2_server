@@ -4,9 +4,11 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)]([LICENSE](LICENSE))
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)]([Dockerfile](Dockerfile))
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://postgresql.org/)
+[![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-orange.svg)](https://prometheus.io/)
+[![Grafana](https://img.shields.io/badge/Grafana-Dashboards-blue.svg)](https://grafana.com/)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](#)
 
-OAuth2 сервер на Go 1.23.4, на базе PostgreSQL
+OAuth2 сервер на Go 1.23.4, на базе PostgreSQL с мониторингом Prometheus и Grafana
 
 ## Возможности
 
@@ -22,6 +24,8 @@ OAuth2 сервер на Go 1.23.4, на базе PostgreSQL
 - Структурированное логирование
 - Health check
 - CORS поддержка
+- **Prometheus метрики**
+- **Grafana дашборды**
 
 ## Быстрый старт с Docker
 
@@ -33,8 +37,11 @@ cd go_oauth2_server
 
 ### 2. Запустите с помощью Docker Compose:
 ```bash
-# Быстрый запуск
+# Быстрый запуск (только OAuth2 + PostgreSQL)
 ./scripts/quick-start.sh
+
+# Запуск с мониторингом (OAuth2 + PostgreSQL + Prometheus + Grafana)
+./scripts/start-with-monitoring.sh
 
 # Или вручную
 docker-compose up -d
@@ -47,6 +54,9 @@ docker-compose ps
 
 # Health check
 curl http://localhost:8080/health
+
+# Метрики Prometheus
+curl http://localhost:8080/metrics
 
 # Логи
 docker-compose logs
@@ -98,6 +108,12 @@ go run ./cmd/server/main.go
 ```bash
 # Запуск всех сервисов
 docker-compose up -d
+
+# Запуск с мониторингом
+docker-compose --profile monitoring up -d
+
+# Запуск с разработкой и мониторингом
+docker-compose --profile dev --profile monitoring up -d
 
 # Остановка сервисов
 docker-compose down
@@ -154,6 +170,53 @@ docker-compose up --force-recreate --build
 ./scripts/restart-fixed.sh
 ```
 
+### Мониторинг:
+```bash
+# Запуск с мониторингом
+./scripts/start-with-monitoring.sh
+
+# Проверка метрик
+curl http://localhost:8080/metrics
+
+# Доступ к Prometheus
+open http://localhost:9090
+
+# Доступ к Grafana
+open http://localhost:3000
+```
+
+## Мониторинг
+
+### Prometheus метрики
+
+Сервер предоставляет следующие метрики:
+
+- `http_requests_total` - общее количество HTTP запросов
+- `http_request_duration_seconds` - длительность HTTP запросов
+- `oauth2_tokens_issued_total` - количество выданных OAuth2 токенов
+- `oauth2_tokens_validated_total` - количество валидированных токенов
+
+### Доступные URL для мониторинга:
+
+- **OAuth2 Server**: http://localhost:8080
+- **Health Check**: http://localhost:8080/health
+- **Metrics**: http://localhost:8080/metrics
+- **Prometheus**: http://localhost:9090
+- **Grafana**: http://localhost:3000 (admin/admin)
+
+### Настройка Grafana:
+
+1. Откройте http://localhost:3000
+2. Войдите с учетными данными: `admin/admin`
+3. Добавьте источник данных Prometheus:
+   - URL: `http://prometheus:9090`
+   - Access: `Server (default)`
+4. Создайте дашборды для мониторинга:
+   - HTTP запросы
+   - OAuth2 токены
+   - Время ответа
+   - Ошибки
+
 ## API Endpoints
 
 ### 1. Health Check
@@ -161,7 +224,12 @@ docker-compose up --force-recreate --build
 GET /health
 ```
 
-### 2. Регистрация клиента
+### 2. Metrics (Prometheus)
+```bash
+GET /metrics
+```
+
+### 3. Регистрация клиента
 ```bash
 POST /clients
 Content-Type: application/json
@@ -173,7 +241,7 @@ Content-Type: application/json
 }
 ```
 
-### 3. Регистрация пользователя
+### 4. Регистрация пользователя
 ```bash
 POST /users
 Content-Type: application/json
@@ -184,7 +252,7 @@ Content-Type: application/json
 }
 ```
 
-### 4. Authorization Code Grant
+### 5. Authorization Code Grant
 ```bash
 # Шаг 1: Получение authorization code
 GET /authorize?response_type=code&client_id=CLIENT_ID&redirect_uri=http://localhost:3000/callback&scope=read&state=random_state
@@ -196,7 +264,7 @@ Content-Type: application/x-www-form-urlencoded
 grant_type=authorization_code&code=AUTHORIZATION_CODE&client_id=CLIENT_ID&client_secret=CLIENT_SECRET&redirect_uri=http://localhost:3000/callback
 ```
 
-### 5. Client Credentials Grant
+### 6. Client Credentials Grant
 ```bash
 POST /token
 Content-Type: application/x-www-form-urlencoded
@@ -204,7 +272,7 @@ Content-Type: application/x-www-form-urlencoded
 grant_type=client_credentials&client_id=CLIENT_ID&client_secret=CLIENT_SECRET&scope=read
 ```
 
-### 6. Resource Owner Password Credentials
+### 7. Resource Owner Password Credentials
 ```bash
 POST /token
 Content-Type: application/x-www-form-urlencoded
@@ -212,7 +280,7 @@ Content-Type: application/x-www-form-urlencoded
 grant_type=password&username=testuser&password=testpass&client_id=CLIENT_ID&client_secret=CLIENT_SECRET
 ```
 
-### 7. Refresh Token
+### 8. Refresh Token
 ```bash
 POST /token
 Content-Type: application/x-www-form-urlencoded
@@ -220,7 +288,7 @@ Content-Type: application/x-www-form-urlencoded
 grant_type=refresh_token&refresh_token=REFRESH_TOKEN&client_id=CLIENT_ID&client_secret=CLIENT_SECRET
 ```
 
-### 8. Token Introspection
+### 9. Token Introspection
 ```bash
 POST /introspect
 Content-Type: application/json
@@ -244,6 +312,8 @@ oauth2-server/
 ├── migrations/                 # Миграции БД
 │   ├── 001_initial.up.sql
 │   └── 001_initial.down.sql
+├── monitoring/                 # Конфигурация мониторинга
+│   └── prometheus.yml
 ├── scripts/                    # Скрипты для Docker
 ├── docker-compose.yml          # Docker Compose конфигурация
 ├── Dockerfile                  # Docker образ
@@ -273,6 +343,8 @@ oauth2-server/
    # Проверьте занятые порты
    lsof -i :8080
    lsof -i :5433
+   lsof -i :9090
+   lsof -i :3000
    
    # Остановите конфликтующие процессы
    ./scripts/troubleshoot.sh
@@ -318,6 +390,24 @@ oauth2-server/
    # Удалите volumes и перезапустите
    docker-compose down --volumes
    docker-compose up -d
+   ```
+
+### Проблемы с мониторингом:
+
+1. **Prometheus не собирает метрики:**
+   ```bash
+   # Проверьте конфигурацию
+   docker-compose logs prometheus
+   
+   # Проверьте доступность метрик
+   curl http://localhost:8080/metrics
+   ```
+
+2. **Grafana не подключается к Prometheus:**
+   ```bash
+   # Проверьте URL в Grafana: http://prometheus:9090
+   # Проверьте сеть Docker
+   docker network inspect go_oauth2_server_oauth2-network
    ```
 
 ### Проблемы с локальной разработкой:
@@ -366,6 +456,7 @@ oauth2-server/
 - Ограничьте доступ к базе данных
 - Регулярно обновляйте зависимости
 - Мониторьте логи на предмет подозрительной активности
+- Настройте аутентификацию для Grafana в продакшене
 
 ## Лицензия
 

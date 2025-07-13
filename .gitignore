@@ -47,8 +47,8 @@ tmp/
 temp/
 
 # Docker
-Dockerfile*
-docker-compose*.yml
+#Dockerfile*
+#docker-compose*.yml
 .dockerignore
 
 # Scripts
