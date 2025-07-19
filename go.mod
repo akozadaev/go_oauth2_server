@@ -3,11 +3,11 @@ module go_oauth2_server
 go 1.23.4
 
 require (
+	github.com/go-chi/chi/v5 v5.0.12
 	github.com/go-oauth2/oauth2/v4 v4.5.3
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.18.3
 	github.com/google/uuid v1.6.0
-	github.com/gorilla/mux v1.8.1
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
 	github.com/prometheus/client_golang v1.19.0
