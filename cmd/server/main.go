@@ -18,10 +18,10 @@ import (
 	"go_oauth2_server/internal/handlers"
 	"go_oauth2_server/internal/storage"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus"
@@ -120,20 +120,24 @@ func run() error {
 	store := storage.NewPostgresStore(db)
 	h := handlers.New(store, logger, cfg)
 
-	router := mux.NewRouter()
-	router.HandleFunc("/authorize", h.Authorize).Methods("GET", "POST")
-	router.HandleFunc("/token", h.Token).Methods("POST")
-	router.HandleFunc("/introspect", h.Introspect).Methods("POST")
-	router.HandleFunc("/clients", h.RegisterClient).Methods("POST")
-	router.HandleFunc("/health", h.Health).Methods("GET")
-	router.HandleFunc("/users", h.RegisterUser).Methods("POST")
+	router := chi.NewRouter()
 
-	// Prometheus метрики
-	router.Handle("/metrics", promhttp.Handler()).Methods("GET")
-
+	// Middleware
 	router.Use(loggingMiddleware(logger))
 	router.Use(corsMiddleware)
 	router.Use(metricsMiddleware)
+
+	// Routes
+	router.Route("/", func(r chi.Router) {
+		r.HandleFunc("/authorize", h.Authorize)
+		r.HandleFunc("/token", h.Token)
+		r.HandleFunc("/introspect", h.Introspect)
+		r.HandleFunc("/clients", h.RegisterClient)
+		r.HandleFunc("/health", h.Health)
+		r.HandleFunc("/users", h.RegisterUser)
+		// Prometheus метрики
+		r.Handle("/metrics", promhttp.Handler())
+	})
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -209,7 +213,7 @@ func runMigrations(databaseURL string) error {
 	return nil
 }
 
-func loggingMiddleware(logger *slog.Logger) mux.MiddlewareFunc {
+func loggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
