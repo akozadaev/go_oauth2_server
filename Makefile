@@ -23,13 +23,6 @@ release: ## 📦 Сборка для продакшена (Linux AMD64)
 fmt: ## 🧹 Форматирование gofmt (автоисправление)
 	gofmt -s -w .
 
-test: ## 🧪 Тестирование (локально)
-	go test -v ./...
-
-test-coverage: ## 🧪 Покрытие тестами
-	go test -cover -coverprofile=coverage.out ./...
-	go tool cover -func=coverage.out
-
 lint-full: ## 🧼 Полный линтинг с golangci-lint
 	@if ! [ -x "$$(command -v golangci-lint)" ]; then \
 		echo "Installing golangci-lint..."; \
@@ -202,9 +195,6 @@ redis-shell: ## 🐚 Подключиться к Redis
 shell-fixed: ## 🐚 Подключиться к исправленной версии
 	docker exec -it oauth2-server-fixed sh
 
-docker-test: ## 🧪 Запустить тесты в Docker
-	docker-compose exec oauth2-server go test ./... -v
-
 diagnose: ## 🔍 Полная диагностика системы
 	@chmod +x scripts/diagnose.sh
 	@./scripts/diagnose.sh
@@ -302,6 +292,14 @@ dev: ## 👨‍💻 Режим разработки (локальная сбор
 	 REDIS_URL="redis://:redis_password@localhost:6380/0" \
 	 ./go_oauth2_server
 
+fix-perms:
+	@echo "Установка прав доступа для папок и фалов кода..."
+	@# Права 644 для всех .go, .mod, .sum и других исходных файлов
+	find . -type f \( -name "*.go" -o -name "go.mod" -o -name "go.sum" -o -name "*.yaml" -o -name "*.yml" -o -name "*.json" -o -name "*.toml" \) -exec chmod 644 {} + 2>/dev/null || true
+	@# Права 755 для всех директорий
+	find . -type d -exec chmod 755 {} + 2>/dev/null || true
+	@echo "Права установлены."
+
 help: ## 📚 Показать справку
 	@echo "OAuth2 Server - Команды разработки и развертывания"
 	@echo ""
@@ -311,7 +309,7 @@ help: ## 📚 Показать справку
 	@echo "🐳 DOCKER:"
 	@grep -E '^[a-zA-Z_-]+:.*?## 🧹|^[a-zA-Z_-]+:.*?## 🛑|^[a-zA-Z_-]+:.*?## 🔨|^[a-zA-Z_-]+:.*?## 🚀|^[a-zA-Z_-]+:.*?## ⏹️|^[a-zA-Z_-]+:.*?## 📋|^[a-zA-Z_-]+:.*?## 📊|^[a-zA-Z_-]+:.*?## 🔄|^[a-zA-Z_-]+:.*?## 🔌|^[a-zA-Z_-]+:.*?## 🐚|^[a-zA-Z_-]+:.*?## 🔍|^[a-zA-Z_-]+:.*?## 🏥' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
-	@echo "🔑 ТО��ЕНЫ:"
+	@echo "🔑 ТОКЕНЫ:"
 	@grep -E '^[a-zA-Z_-]+:.*?## 🧹|^[a-zA-Z_-]+:.*?## 📊|^[a-zA-Z_-]+:.*?## 📈' $(MAKEFILE_LIST) | grep -E 'tokens|clean-tokens|show-tokens|count-tokens' | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "⚡ БЫСТРЫЕ КОМАНДЫ:"
@@ -321,3 +319,32 @@ help: ## 📚 Показать справку
 	@echo "  make show-tokens     # Показать активные токены"
 	@echo "  make clean-tokens    # Очистить истекшие токены"
 	@echo "  make count-tokens    # Статистика токенов"
+
+# Testing commands
+docker-test: ## 🧪 Запустить тесты в Docker
+	docker-compose exec oauth2-server go test ./... -v
+
+.PHONY: test
+test: ## Запустить все тесты (локально)
+	go test -v ./...
+
+.PHONY: test-unit
+test-unit: ## Запустить только unit тесты
+	go test -v ./internal/...
+
+.PHONY: test-integration
+test-integration: ## Запустить только integration тесты
+	go test -v ./tests/...
+
+.PHONY: test-coverage
+test-coverage: ## Запустить тесты с покрытием
+	go test -v -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+
+.PHONY: test-docker
+test-docker: ## Запустить тесты с Docker контейнерами
+	./scripts/test-with-docker.sh
+
+.PHONY: test-docker-compose
+test-docker-compose: ## Запустить тесты с Docker Compose
+	docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from tests
