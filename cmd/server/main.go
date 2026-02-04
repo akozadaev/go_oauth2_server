@@ -112,6 +112,11 @@ func run() error {
 		return err
 	}
 
+	// Connection pooling для производительности под нагрузкой
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
 	if err := runMigrations(cfg.DatabaseURL); err != nil {
 		logger.Error("Failed to run migrations", "error", err)
 		return err

@@ -60,18 +60,6 @@ func (s *PostgresStore) CreateClient(ctx context.Context, client *models.Client)
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	// Also add to OAuth2 client store
-	clientInfo := &oauthModels.Client{
-		ID:     client.ID,
-		Secret: client.Secret,
-		Domain: client.Domain,
-		UserID: client.UserID,
-	}
-
-	if cs, ok := s.clientStore.(*ClientStore); ok {
-		return cs.Set(ctx, client.ID, clientInfo)
-	}
-
 	return nil
 }
 
@@ -184,23 +172,11 @@ func (s *PostgresStore) GetTokenStats(ctx context.Context) (map[string]int64, er
 
 // ClientStore implements oauth2.ClientStore
 type ClientStore struct {
-	db      *sql.DB
-	clients map[string]oauth2.ClientInfo
-	logger  *slog.Logger
+	db     *sql.DB
+	logger *slog.Logger
 }
 
 func (cs *ClientStore) GetByID(ctx context.Context, id string) (oauth2.ClientInfo, error) {
-	// First check in-memory cache
-	if cs.clients != nil {
-		if client, exists := cs.clients[id]; exists {
-			if cs.logger != nil {
-				cs.logger.Debug("Client found in cache", "client_id", id)
-			}
-			return client, nil
-		}
-	}
-
-	// Query database
 	client := &oauthModels.Client{}
 	query := `
         SELECT id, secret, domain, user_id
@@ -222,17 +198,4 @@ func (cs *ClientStore) GetByID(ctx context.Context, id string) (oauth2.ClientInf
 	}
 
 	return client, nil
-}
-
-func (cs *ClientStore) Set(ctx context.Context, id string, client oauth2.ClientInfo) error {
-	if cs.clients == nil {
-		cs.clients = make(map[string]oauth2.ClientInfo)
-	}
-	cs.clients[id] = client
-
-	if cs.logger != nil {
-		cs.logger.Debug("Client cached", "client_id", id)
-	}
-
-	return nil
 }
