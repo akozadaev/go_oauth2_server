@@ -107,10 +107,25 @@ func run() error {
 	}
 	defer db.Close()
 
+	// Настройка connection pooling для высокой нагрузки
+	// MaxOpenConns: максимальное количество открытых соединений
+	// MaxIdleConns: максимальное количество idle соединений в пуле
+	// ConnMaxLifetime: максимальное время жизни соединения
+	db.SetMaxOpenConns(25)                 // Рекомендуется: (2 * CPU cores) + эффективное количество дисковых шпинделей
+	db.SetMaxIdleConns(5)                  // Рекомендуется: меньше MaxOpenConns
+	db.SetConnMaxLifetime(5 * time.Minute) // Предотвращает использование старых соединений
+	db.SetConnMaxIdleTime(1 * time.Minute) // Закрывает idle соединения
+
 	if err := db.PingContext(ctx); err != nil {
 		logger.Error("Failed to ping database", "error", err)
 		return err
 	}
+
+	logger.Info("Database connection pool configured",
+		"max_open_conns", 25,
+		"max_idle_conns", 5,
+		"conn_max_lifetime", "5m",
+		"conn_max_idle_time", "1m")
 
 	if err := runMigrations(cfg.DatabaseURL); err != nil {
 		logger.Error("Failed to run migrations", "error", err)
