@@ -39,6 +39,160 @@
                 }
             }
         },
+        "/clients/register": {
+            "post": {
+                "description": "Создание нового OAuth2 клиента с автоматической генерацией учетных данных",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "clients"
+                ],
+                "summary": "Регистрация клиента OAuth2",
+                "parameters": [
+                    {
+                        "description": "Данные для регистрации клиента",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/go_oauth2_server_internal_models.ClientRegistrationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Успешная регистрация клиента",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный формат запроса",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Проверка состояния сервиса и подключения к базе данных",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Проверка работоспособности сервиса",
+                "responses": {
+                    "200": {
+                        "description": "Сервис работает корректно:",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "503": {
+                        "description": "Сервис недоступен:",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/introspect": {
+            "post": {
+                "description": "Проверка статуса и метаданных токена доступа (OAuth2 RFC 7662)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "introspect"
+                ],
+                "summary": "Интроспекция токена",
+                "parameters": [
+                    {
+                        "description": "Данные для интроспекции токена",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/go_oauth2_server_internal_models.IntrospectRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Информация о токене:",
+                        "schema": {
+                            "$ref": "#/definitions/go_oauth2_server_internal_models.IntrospectResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный формат запроса. Пример:",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Неавторизованный доступ (при защите эндпоинта)",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Превышен лимит запросов. Пример:",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/token": {
             "post": {
                 "description": "АОбмен кода на токен",
@@ -80,6 +234,157 @@
                             }
                         }
                     }
+                }
+            }
+        },
+        "/users/register": {
+            "post": {
+                "description": "Создание учетной записи нового пользователя в системе",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Регистрация нового пользователя",
+                "parameters": [
+                    {
+                        "description": "Данные для регистрации пользователя",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/go_oauth2_server_internal_models.UserRegistrationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Успешная регистрация пользователя",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный формат запроса или отсутствуют обязательные поля",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Ошибка сервера при создании пользователя",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "go_oauth2_server_internal_models.ClientRegistrationRequest": {
+            "description": "Данные для регистрации клиента OAuth2",
+            "type": "object",
+            "required": [
+                "domain"
+            ],
+            "properties": {
+                "domain": {
+                    "description": "Домен клиента\n@example example.com",
+                    "type": "string"
+                },
+                "grant_types": {
+                    "description": "Список разрешенных типов грантов\n@example [\"authorization_code\",\"client_credentials\"]",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "password": {
+                    "description": "Пароль для создания нового пользователя (опционально)\n@example securepassword123",
+                    "type": "string"
+                },
+                "redirect_uris": {
+                    "description": "Список URI для перенаправления\n@example [\"https://example.com/callback\"]",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "user_id": {
+                    "description": "ID существующего пользователя (опционально)\n@example user123",
+                    "type": "string"
+                },
+                "username": {
+                    "description": "Имя пользователя для создания нового пользователя (опционально)\n@example admin",
+                    "type": "string"
+                }
+            }
+        },
+        "go_oauth2_server_internal_models.IntrospectRequest": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                },
+                "token_type_hint": {
+                    "type": "string"
+                }
+            }
+        },
+        "go_oauth2_server_internal_models.IntrospectResponse": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "client_id": {
+                    "type": "string"
+                },
+                "exp": {
+                    "type": "integer"
+                },
+                "scope": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "go_oauth2_server_internal_models.UserRegistrationRequest": {
+            "description": "Данные для регистрации нового пользователя",
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "email": {
+                    "description": "Email пользователя (опционально)\n@example john@example.com\n@format email",
+                    "type": "string"
+                },
+                "password": {
+                    "description": "Пароль пользователя\n@example securepassword123\n@minLength 8\n@maxLength 100",
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 8
+                },
+                "username": {
+                    "description": "Имя пользователя (логин)\n@example john_doe\n@minLength 3\n@maxLength 50",
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 3
                 }
             }
         }

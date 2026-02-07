@@ -191,6 +191,46 @@ func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Introspect godoc
+// @Summary Интроспекция токена
+// @Description Проверка статуса и метаданных токена доступа (OAuth2 RFC 7662)
+// @Tags introspect
+// @Accept json
+// @Produce json
+// @Param request body models.IntrospectRequest true "Данные для интроспекции токена"
+// @Success 200 {object} models.IntrospectResponse "Информация о токене:
+//
+//	{
+//	  \"active\": true,
+//	  \"client_id\": \"client123\",
+//	  \"user_id\": \"user456\",
+//	  \"scope\": \"read write\",
+//	  \"exp\": 1735689600
+//	}
+//
+// или для неактивного токена:
+//
+//	{
+//	  \"active\": false
+//	}"
+//
+// @Failure 400 {object} map[string]string "Неверный формат запроса. Пример:
+//
+//	{
+//	  \"error\": \"invalid_request\",
+//	  \"error_description\": \"Token parameter is required\"
+//	}"
+//
+// @Failure 401 {object} map[string]string "Неавторизованный доступ (при защите эндпоинта)"
+// @Failure 429 {object} map[string]string "Превышен лимит запросов. Пример:
+//
+//	{
+//	  \"error\": \"too_many_requests\",
+//	  \"error_description\": \"Rate limit exceeded\"
+//	}"
+//
+// @Failure 500 {object} map[string]string "Внутренняя ошибка сервера"
+// @Router /introspect [post]
 func (h *Handler) Introspect(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -289,6 +329,17 @@ func (h *Handler) validateJWTToken(tokenString string) models.IntrospectResponse
 	}
 }
 
+// RegisterClient godoc
+// @Summary Регистрация клиента OAuth2
+// @Description Создание нового OAuth2 клиента с автоматической генерацией учетных данных
+// @Tags clients
+// @Accept json
+// @Produce json
+// @Param request body models.ClientRegistrationRequest true "Данные для регистрации клиента"
+// @Success 201 {object} map[string]interface{} "Успешная регистрация клиента"
+// @Failure 400 {object} map[string]string "Неверный формат запроса"
+// @Failure 500 {object} map[string]string "Ошибка сервера"
+// @Router /clients/register [post]
 func (h *Handler) RegisterClient(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -352,6 +403,17 @@ func (h *Handler) RegisterClient(w http.ResponseWriter, r *http.Request) {
 	h.writeJSONResponse(w, response, http.StatusCreated)
 }
 
+// RegisterUser godoc
+// @Summary Регистрация нового пользователя
+// @Description Создание учетной записи нового пользователя в системе
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param request body models.UserRegistrationRequest true "Данные для регистрации пользователя"
+// @Success 201 {object} map[string]interface{} "Успешная регистрация пользователя"
+// @Failure 400 {object} map[string]string "Неверный формат запроса или отсутствуют обязательные поля"
+// @Failure 500 {object} map[string]string "Ошибка сервера при создании пользователя"
+// @Router /users/register [post]
 func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -395,6 +457,33 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	h.writeJSONResponse(w, response, http.StatusCreated)
 }
 
+// Health godoc
+// @Summary Проверка работоспособности сервиса
+// @Description Проверка состояния сервиса и подключения к базе данных
+// @Tags health
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Сервис работает корректно:
+//
+//	{
+//	  \"status\": \"healthy\",
+//	  \"timestamp\": 1735689600,
+//	  \"version\": \"1.1.1\",
+//	  \"database\": \"ok\",
+//	  \"uptime\": \"2h 15m\"
+//	}"
+//
+// @Failure 503 {object} map[string]interface{} "Сервис недоступен:
+//
+//	{
+//	  \"status\": \"unhealthy\",
+//	  \"timestamp\": 1735689600,
+//	  \"errors\": {
+//	    \"database\": \"connection timeout\"
+//	  }
+//	}"
+//
+// @Router /health [get]
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

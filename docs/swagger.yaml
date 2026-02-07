@@ -1,3 +1,95 @@
+definitions:
+  go_oauth2_server_internal_models.ClientRegistrationRequest:
+    description: Данные для регистрации клиента OAuth2
+    properties:
+      domain:
+        description: |-
+          Домен клиента
+          @example example.com
+        type: string
+      grant_types:
+        description: |-
+          Список разрешенных типов грантов
+          @example ["authorization_code","client_credentials"]
+        items:
+          type: string
+        type: array
+      password:
+        description: |-
+          Пароль для создания нового пользователя (опционально)
+          @example securepassword123
+        type: string
+      redirect_uris:
+        description: |-
+          Список URI для перенаправления
+          @example ["https://example.com/callback"]
+        items:
+          type: string
+        type: array
+      user_id:
+        description: |-
+          ID существующего пользователя (опционально)
+          @example user123
+        type: string
+      username:
+        description: |-
+          Имя пользователя для создания нового пользователя (опционально)
+          @example admin
+        type: string
+    required:
+    - domain
+    type: object
+  go_oauth2_server_internal_models.IntrospectRequest:
+    properties:
+      token:
+        type: string
+      token_type_hint:
+        type: string
+    type: object
+  go_oauth2_server_internal_models.IntrospectResponse:
+    properties:
+      active:
+        type: boolean
+      client_id:
+        type: string
+      exp:
+        type: integer
+      scope:
+        type: string
+      user_id:
+        type: string
+    type: object
+  go_oauth2_server_internal_models.UserRegistrationRequest:
+    description: Данные для регистрации нового пользователя
+    properties:
+      email:
+        description: |-
+          Email пользователя (опционально)
+          @example john@example.com
+          @format email
+        type: string
+      password:
+        description: |-
+          Пароль пользователя
+          @example securepassword123
+          @minLength 8
+          @maxLength 100
+        maxLength: 100
+        minLength: 8
+        type: string
+      username:
+        description: |-
+          Имя пользователя (логин)
+          @example john_doe
+          @minLength 3
+          @maxLength 50
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - password
+    - username
+    type: object
 info:
   contact: {}
 paths:
@@ -24,6 +116,109 @@ paths:
       summary: Авторизация (POST)
       tags:
       - authorize
+  /clients/register:
+    post:
+      consumes:
+      - application/json
+      description: Создание нового OAuth2 клиента с автоматической генерацией учетных
+        данных
+      parameters:
+      - description: Данные для регистрации клиента
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/go_oauth2_server_internal_models.ClientRegistrationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Успешная регистрация клиента
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Неверный формат запроса
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Регистрация клиента OAuth2
+      tags:
+      - clients
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Проверка состояния сервиса и подключения к базе данных
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'Сервис работает корректно:'
+          schema:
+            additionalProperties: true
+            type: object
+        "503":
+          description: 'Сервис недоступен:'
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Проверка работоспособности сервиса
+      tags:
+      - health
+  /introspect:
+    post:
+      consumes:
+      - application/json
+      description: Проверка статуса и метаданных токена доступа (OAuth2 RFC 7662)
+      parameters:
+      - description: Данные для интроспекции токена
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/go_oauth2_server_internal_models.IntrospectRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'Информация о токене:'
+          schema:
+            $ref: '#/definitions/go_oauth2_server_internal_models.IntrospectResponse'
+        "400":
+          description: 'Неверный формат запроса. Пример:'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Неавторизованный доступ (при защите эндпоинта)
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "429":
+          description: 'Превышен лимит запросов. Пример:'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Интроспекция токена
+      tags:
+      - introspect
   /token:
     post:
       consumes:
@@ -53,4 +248,39 @@ paths:
       summary: Обмен кода на токен
       tags:
       - token
+  /users/register:
+    post:
+      consumes:
+      - application/json
+      description: Создание учетной записи нового пользователя в системе
+      parameters:
+      - description: Данные для регистрации пользователя
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/go_oauth2_server_internal_models.UserRegistrationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Успешная регистрация пользователя
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Неверный формат запроса или отсутствуют обязательные поля
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Ошибка сервера при создании пользователя
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Регистрация нового пользователя
+      tags:
+      - users
 swagger: "2.0"
