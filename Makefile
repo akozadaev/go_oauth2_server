@@ -1,5 +1,5 @@
 # Makefile для OAuth2 сервера
-.PHONY: help tools generate build release fmt test test-coverage lint-full lint-fix check clean-all clean-deps clean-deps-safe fix-network vendor stop-conflicts docker-build docker-build-simple docker-build-offline up up-simple up-no-build down logs logs-server logs-db logs-redis logs-fixed status restart restart-server check-ports shell db-shell redis-shell shell-fixed docker-test diagnose diagnose-container health quick-start quick-start-simple quick-start-fixed debug dev clean-tokens show-tokens count-tokens
+.PHONY: help tools generate build release fmt test test-coverage lint-full lint-fix check clean-all clean-deps clean-deps-safe fix-network vendor stop-conflicts docker-build docker-build-simple docker-build-offline up up-simple up-no-build down logs logs-server logs-db logs-redis logs-fixed status restart restart-server check-ports shell db-shell redis-shell shell-fixed docker-test diagnose diagnose-container health quick-start quick-start-simple quick-start-fixed debug dev clean-tokens show-tokens count-tokens fix-perms test-unit test-integration test-docker test-docker-compose
 
 # ==================== РАЗРАБОТКА ====================
 
@@ -302,6 +302,14 @@ dev: ## 👨‍💻 Режим разработки (локальная сбор
 	 REDIS_URL="redis://:redis_password@localhost:6380/0" \
 	 ./go_oauth2_server
 
+fix-perms:
+	@echo "Установка прав доступа для папок и фалов кода..."
+	@# Права 644 для всех .go, .mod, .sum и других исходных файлов
+	find . -type f \( -name "*.go" -o -name "go.mod" -o -name "go.sum" -o -name "*.yaml" -o -name "*.yml" -o -name "*.json" -o -name "*.toml" \) -exec chmod 644 {} + 2>/dev/null || true
+	@# Права 755 для всех директорий
+	find . -type d -exec chmod 755 {} + 2>/dev/null || true
+	@echo "Права установлены."
+
 help: ## 📚 Показать справку
 	@echo "OAuth2 Server - Команды разработки и развертывания"
 	@echo ""
@@ -311,7 +319,7 @@ help: ## 📚 Показать справку
 	@echo "🐳 DOCKER:"
 	@grep -E '^[a-zA-Z_-]+:.*?## 🧹|^[a-zA-Z_-]+:.*?## 🛑|^[a-zA-Z_-]+:.*?## 🔨|^[a-zA-Z_-]+:.*?## 🚀|^[a-zA-Z_-]+:.*?## ⏹️|^[a-zA-Z_-]+:.*?## 📋|^[a-zA-Z_-]+:.*?## 📊|^[a-zA-Z_-]+:.*?## 🔄|^[a-zA-Z_-]+:.*?## 🔌|^[a-zA-Z_-]+:.*?## 🐚|^[a-zA-Z_-]+:.*?## 🔍|^[a-zA-Z_-]+:.*?## 🏥' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
-	@echo "🔑 ТО��ЕНЫ:"
+	@echo "🔑 ТОКЕНЫ:"
 	@grep -E '^[a-zA-Z_-]+:.*?## 🧹|^[a-zA-Z_-]+:.*?## 📊|^[a-zA-Z_-]+:.*?## 📈' $(MAKEFILE_LIST) | grep -E 'tokens|clean-tokens|show-tokens|count-tokens' | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "⚡ БЫСТРЫЕ КОМАНДЫ:"
@@ -321,3 +329,14 @@ help: ## 📚 Показать справку
 	@echo "  make show-tokens     # Показать активные токены"
 	@echo "  make clean-tokens    # Очистить истекшие токены"
 	@echo "  make count-tokens    # Статистика токенов"
+test-unit: ## 🧪 Запустить только unit тесты
+	go test -v ./internal/...
+
+test-integration: ## 🧪 Запустить только integration тесты
+	go test -v ./tests/...
+
+test-docker: ## 🧪 Запустить тесты с Docker контейнерами
+	./scripts/test-with-docker.sh
+
+test-docker-compose: ## 🧪 Запустить тесты с Docker Compose
+	docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from tests

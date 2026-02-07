@@ -1,0 +1,148 @@
+events {
+    worker_connections 2048;
+    use epoll;  # Эффективный метод для Linux
+}
+
+http {
+    # Кеширование
+    proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=oauth2_cache:10m max_size=100m inactive=60m use_temp_path=off;
+
+    # Upstream для балансировки нагрузки между несколькими экземплярами
+    upstream oauth2_backend {
+        least_conn;  # Балансировка по наименьшему количеству соединений
+        # Для production добавьте несколько серверов:
+        server oauth2-server-1:8080 max_fails=3 fail_timeout=30s;
+        server oauth2-server-2:8080 max_fails=3 fail_timeout=30s;
+        server oauth2-server-3:8080 max_fails=3 fail_timeout=30s;
+        
+        # Для Docker Compose с одним сервисом (с несколькими репликами):
+        # server oauth2-server:8080 max_fails=3 fail_timeout=30s;
+        
+        keepalive 32;  # Keep-alive соединения для upstream
+    }
+
+    # Rate limiting
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+    limit_req_zone $binary_remote_addr zone=auth:10m rate=5r/s;
+    limit_req_zone $binary_remote_addr zone=token:10m rate=20r/s;
+
+    # SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1000;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss;
+
+    server {
+        listen 80;
+        server_name localhost;
+
+        # Увеличиваем размеры буферов для высокой нагрузки
+        client_body_buffer_size 128k;
+        client_max_body_size 10m;
+        client_header_buffer_size 1k;
+        large_client_header_buffers 4 4k;
+
+        # Таймауты
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+
+        # Security headers
+        add_header X-Frame-Options DENY;
+        add_header X-Content-Type-Options nosniff;
+        add_header X-XSS-Protection "1; mode=block";
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+        # Health check endpoint (без rate limiting)
+        location /health {
+            proxy_pass http://oauth2_backend/health;
+            access_log off;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Metrics endpoint (без rate limiting, но с ограничением доступа)
+        location /metrics {
+            # В production добавьте IP whitelist или basic auth
+            # allow 10.0.0.0/8;
+            # deny all;
+            proxy_pass http://oauth2_backend/metrics;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # OAuth2 authorize endpoint с rate limiting
+        location ~ ^/authorize {
+            limit_req zone=auth burst=20 nodelay;
+            proxy_pass http://oauth2_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Keep-alive для upstream
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+        }
+
+        # Token endpoint с более высоким rate limit
+        location ~ ^/token {
+            limit_req zone=token burst=50 nodelay;
+            proxy_pass http://oauth2_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+        }
+
+        # Introspect endpoint (кеширование результатов)
+        location ~ ^/introspect {
+            limit_req zone=api burst=50 nodelay;
+            
+            # Кеширование только для валидных токенов
+            proxy_cache oauth2_cache;
+            proxy_cache_valid 200 10s;  # Кешируем валидные токены на 10 секунд
+            proxy_cache_valid 404 1s;   # Кешируем невалидные токены на 1 секунду
+            proxy_cache_key "$scheme$request_method$host$request_uri$request_body";
+            proxy_cache_methods POST;
+            proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+            
+            proxy_pass http://oauth2_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+        }
+
+        # API endpoints
+        location / {
+            limit_req zone=api burst=50 nodelay;
+            proxy_pass http://oauth2_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+        }
+    }
+}
+

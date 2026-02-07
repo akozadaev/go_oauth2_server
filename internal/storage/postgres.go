@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"go_oauth2_server/internal/models"
 
@@ -22,9 +23,10 @@ type PostgresStore struct {
 
 func NewPostgresStore(db *sql.DB) *PostgresStore {
 	logger := slog.Default()
+	// ClientStore теперь stateless (без in-memory кеша) для поддержки горизонтального масштабирования
 	clientStore := &ClientStore{db: db, logger: logger}
 	var tokenStore oauth2.TokenStore
-	if logger != nil { // TODO  Подумать о реализации. Пока так оставлю
+	if logger != nil {
 		tokenStore = NewProductionTokenStore(db, logger) // Продакшн
 	} else {
 		tokenStore = NewSimpleTokenStore(db) // Разработка
@@ -171,22 +173,38 @@ func (s *PostgresStore) GetTokenStats(ctx context.Context) (map[string]int64, er
 }
 
 // ClientStore implements oauth2.ClientStore
+// Примечание: In-memory кеш убран для поддержки горизонтального масштабирования.
+// Вместо этого всегда обращаемся к БД, которая имеет индекс на id (PRIMARY KEY).
+// Для дальнейшей оптимизации можно добавить Redis для распределенного кеширования.
 type ClientStore struct {
 	db     *sql.DB
 	logger *slog.Logger
 }
 
 func (cs *ClientStore) GetByID(ctx context.Context, id string) (oauth2.ClientInfo, error) {
+	// Всегда обращаемся к БД для поддержки горизонтального масштабирования
+	// PRIMARY KEY на id обеспечивает быстрый поиск
 	client := &oauthModels.Client{}
 	query := `
         SELECT id, secret, domain, user_id
         FROM clients
         WHERE id = $1
     `
-	err := cs.db.QueryRowContext(ctx, query, id).Scan(
+
+	// Добавляем таймаут для запроса
+	queryCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	err := cs.db.QueryRowContext(queryCtx, query, id).Scan(
 		&client.ID, &client.Secret, &client.Domain, &client.UserID,
 	)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			if cs.logger != nil {
+				cs.logger.Debug("Client not found", "client_id", id)
+			}
+			return nil, fmt.Errorf("client not found: %w", err)
+		}
 		if cs.logger != nil {
 			cs.logger.Error("Failed to get client by ID", "client_id", id, "error", err)
 		}
@@ -198,4 +216,14 @@ func (cs *ClientStore) GetByID(ctx context.Context, id string) (oauth2.ClientInf
 	}
 
 	return client, nil
+}
+
+func (cs *ClientStore) Set(ctx context.Context, id string, client oauth2.ClientInfo) error {
+	// Метод Set больше не используется для кеширования,
+	// так как мы всегда обращаемся к БД напрямую
+	// Оставлен для совместимости с интерфейсом oauth2.ClientStore
+	if cs.logger != nil {
+		cs.logger.Debug("ClientStore.Set called (no-op for stateless store)", "client_id", id)
+	}
+	return nil
 }

@@ -1,4 +1,4 @@
-#!/bin/bash
+git stash pop 2>/dev/null || true#!/bin/bash
 
 # Скрипт для тестирования локальной сборки
 
