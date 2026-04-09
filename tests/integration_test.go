@@ -2,13 +2,13 @@ package tests
 
 import (
 	"bytes"
-	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
+	"log"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -18,130 +18,37 @@ import (
 	"go_oauth2_server/internal/handlers"
 	"go_oauth2_server/internal/models"
 	"go_oauth2_server/internal/storage"
+	"go_oauth2_server/testutil"
 
 	"github.com/go-chi/chi/v5"
-	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// getTestDB возвращает подключение к тестовой базе данных
-func getTestDB(t *testing.T) *sql.DB {
-	// Проверяем переменную окружения для тестовой БД
-	dbURL := os.Getenv("TEST_DATABASE_URL")
-	if dbURL == "" {
-		// Используем локальную БД для тестов
-		dbURL = "postgres://test_user:test_password@localhost:5432/test_db?sslmode=disable"
+var integrationTestDB *sql.DB
+
+func TestMain(m *testing.M) {
+	db, cleanup, err := testutil.StartPostgres()
+	if err != nil {
+		log.Printf("Docker unavailable, skipping tests: %v", err)
+		os.Exit(0)
 	}
+	defer func() {
+		db.Close()
+		cleanup()
+	}()
 
-	db, err := sql.Open("postgres", dbURL)
-	require.NoError(t, err)
+	integrationTestDB = db
 
-	// Ждем пока база данных будет готова
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	for i := 0; i < 30; i++ {
-		if err := db.PingContext(ctx); err == nil {
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
-
-	// Создаем таблицы
-	err = createTestTables(db)
-	require.NoError(t, err)
-
-	return db
-}
-
-func createTestTables(db *sql.DB) error {
-	queries := []string{
-		`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`,
-		`CREATE TABLE IF NOT EXISTS clients (
-			id VARCHAR(255) PRIMARY KEY,
-			secret VARCHAR(255) NOT NULL,
-			domain VARCHAR(255),
-			user_id VARCHAR(255),
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE TABLE IF NOT EXISTS users (
-			id VARCHAR(255) PRIMARY KEY,
-			username VARCHAR(255) UNIQUE NOT NULL,
-			password VARCHAR(255) NOT NULL,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE TABLE IF NOT EXISTS tokens (
-			id VARCHAR(255) PRIMARY KEY,
-			client_id VARCHAR(255) NOT NULL,
-			user_id VARCHAR(255),
-			redirect_uri VARCHAR(255),
-			scope VARCHAR(255),
-			code VARCHAR(255),
-			code_created_at TIMESTAMP,
-			code_expires_in INTEGER,
-			access VARCHAR(255),
-			access_created_at TIMESTAMP,
-			access_expires_in INTEGER,
-			refresh VARCHAR(255),
-			refresh_created_at TIMESTAMP,
-			refresh_expires_in INTEGER,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE TABLE IF NOT EXISTS oauth2_tokens (
-			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-			access_token VARCHAR(512) UNIQUE NOT NULL,
-			refresh_token VARCHAR(512),
-			client_id VARCHAR(255) NOT NULL,
-			user_id VARCHAR(255),
-			scope TEXT,
-			access_expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-			refresh_expires_at TIMESTAMP WITH TIME ZONE,
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-		)`,
-	}
-
-	for _, query := range queries {
-		if _, err := db.Exec(query); err != nil {
-			// Игнорируем ошибки если расширение уже существует
-			if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-				continue
-			}
-			return fmt.Errorf("failed to create table: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func cleanupTestDB(db *sql.DB) error {
-	queries := []string{
-		"DELETE FROM oauth2_tokens",
-		"DELETE FROM tokens",
-		"DELETE FROM clients",
-		"DELETE FROM users",
-	}
-
-	for _, query := range queries {
-		if _, err := db.Exec(query); err != nil {
-			// Игнорируем ошибки если таблица не существует
-			if !strings.Contains(err.Error(), "does not exist") {
-				return fmt.Errorf("failed to cleanup table: %w", err)
-			}
-		}
-	}
-
-	return nil
+	code := m.Run()
+	os.Exit(code)
 }
 
 func setupTestServer(t *testing.T) *httptest.Server {
-	db := getTestDB(t)
+	require.NotNil(t, integrationTestDB, "database not initialized (Docker may be unavailable)")
+	require.NoError(t, testutil.CleanupTestDB(integrationTestDB))
 
-	// Очищаем данные перед тестом
-	cleanupTestDB(db)
-
-	store := storage.NewPostgresStore(db)
+	store := storage.NewPostgresStore(integrationTestDB)
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	cfg := &config.Config{
 		Port:              "8080",
@@ -161,15 +68,13 @@ func setupTestServer(t *testing.T) *httptest.Server {
 	router.HandleFunc("/health", handler.Health)
 	router.HandleFunc("/users", handler.RegisterUser)
 
-	server := httptest.NewServer(router)
-	return server
+	return httptest.NewServer(router)
 }
 
 func TestOAuth2Flow_Integration(t *testing.T) {
 	server := setupTestServer(t)
 	defer server.Close()
 
-	// Шаг 1: Создаем пользователя
 	userData := models.User{
 		ID:        "test-user-oauth",
 		Username:  "testuser-oauth",
@@ -182,7 +87,6 @@ func TestOAuth2Flow_Integration(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusCreated, userResp.StatusCode)
 
-	// Шаг 2: Создаем клиента
 	clientData := models.Client{
 		ID:        "test-client-oauth",
 		Secret:    "test-secret",
@@ -196,41 +100,21 @@ func TestOAuth2Flow_Integration(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusCreated, clientResp.StatusCode)
 
-	// Шаг 3: Получаем код авторизации
-	authorizeData := models.AuthorizeRequest{
-		ResponseType: "code",
-		ClientID:     clientData.ID,
-		RedirectURI:  clientData.Domain,
-		Scope:        "read",
-		State:        "test-state",
-		Username:     userData.Username,
-		Password:     userData.Password,
-	}
-
-	authJSON, _ := json.Marshal(authorizeData)
-	authResp, err := http.Post(server.URL+"/authorize", "application/json", bytes.NewBuffer(authJSON))
+	var clientRespData map[string]interface{}
+	err = json.NewDecoder(clientResp.Body).Decode(&clientRespData)
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, authResp.StatusCode)
+	clientID := clientRespData["client_id"].(string)
+	clientSecret := clientRespData["client_secret"].(string)
 
-	var authResponse map[string]interface{}
-	err = json.NewDecoder(authResp.Body).Decode(&authResponse)
-	require.NoError(t, err)
-	assert.Contains(t, authResponse, "code")
+	// Password grant flow
+	tokenForm := url.Values{}
+	tokenForm.Set("grant_type", "password")
+	tokenForm.Set("client_id", clientID)
+	tokenForm.Set("client_secret", clientSecret)
+	tokenForm.Set("username", userData.Username)
+	tokenForm.Set("password", userData.Password)
 
-	code := authResponse["code"].(string)
-	assert.NotEmpty(t, code)
-
-	// Шаг 4: Получаем access token
-	tokenData := models.TokenRequest{
-		GrantType:    "authorization_code",
-		Code:         code,
-		RedirectURI:  clientData.Domain,
-		ClientID:     clientData.ID,
-		ClientSecret: clientData.Secret,
-	}
-
-	tokenJSON, _ := json.Marshal(tokenData)
-	tokenResp, err := http.Post(server.URL+"/token", "application/json", bytes.NewBuffer(tokenJSON))
+	tokenResp, err := http.Post(server.URL+"/token", "application/x-www-form-urlencoded", strings.NewReader(tokenForm.Encode()))
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, tokenResp.StatusCode)
 
@@ -241,10 +125,10 @@ func TestOAuth2Flow_Integration(t *testing.T) {
 	assert.Contains(t, tokenResponse, "token_type")
 	assert.Contains(t, tokenResponse, "expires_in")
 
-	accessToken := tokenResponse["access_token"].(string)
+	accessToken, ok := tokenResponse["access_token"].(string)
+	require.True(t, ok)
 	assert.NotEmpty(t, accessToken)
 
-	// Шаг 5: Интроспекция токена
 	introspectData := models.IntrospectRequest{
 		Token: accessToken,
 	}
