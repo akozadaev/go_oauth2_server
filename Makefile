@@ -5,7 +5,7 @@
 
 tools: ## 🛠 Установка всех утилит
 	go install github.com/mgechev/revive@latest
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.8.0
 
 generate: ## 📦 Генерация всего, что помечено //go:generate
 	go generate ./...
@@ -33,14 +33,14 @@ test-coverage: ## 🧪 Покрытие тестами
 lint-full: ## 🧼 Полный линтинг с golangci-lint
 	@if ! [ -x "$$(command -v golangci-lint)" ]; then \
 		echo "Installing golangci-lint..."; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.61.0; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v2.8.0; \
 	fi
 	golangci-lint run ./...
 
 lint-fix: ## 🧼 Автофиксы линтера
 	@if ! [ -x "$$(command -v golangci-lint)" ]; then \
 		echo "Installing golangci-lint..."; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin v1.61.0; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin v2.8.0; \
 	fi
 	golangci-lint run --fix ./...
 
