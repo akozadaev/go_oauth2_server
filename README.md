@@ -1,12 +1,12 @@
 # OAuth2 Server
 
-[![Go Version](https://img.shields.io/badge/Go-1.23.4-blue.svg)](https://golang.org/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)]([LICENSE](LICENSE))
-[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)]([Dockerfile](Dockerfile))
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://postgresql.org/)
+[![Go Version](https://img.shields.io/badge/Go-1.23.4-blue.svg)](https://go.dev/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](Dockerfile)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 [![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-orange.svg)](https://prometheus.io/)
-[![Grafana](https://img.shields.io/badge/Grafana-Dashboards-blue.svg)](https://grafana.com/)
-[![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](#)
+[![Grafana](https://img.shields.io/badge/Grafana-UI-blue.svg)](https://grafana.com/)
+[![Lint](https://github.com/akozadaev/go_oauth2_server/actions/workflows/lint.yml/badge.svg)](https://github.com/akozadaev/go_oauth2_server/actions/workflows/lint.yml)
 
 OAuth2 сервер на Go 1.23.4, на базе PostgreSQL с мониторингом Prometheus и Grafana
 
@@ -18,6 +18,7 @@ OAuth2 сервер на Go 1.23.4, на базе PostgreSQL с монитори
 - Refresh Token Grant
 - Регистрация клиентов
 - Авторизация пользователей
+- Роли пользователей в JWT claim `roles`
 - JWT токены с настраиваемым временем жизни
 - PostgreSQL база данных
 - Автоматические миграции БД
@@ -25,8 +26,8 @@ OAuth2 сервер на Go 1.23.4, на базе PostgreSQL с монитори
 - Health check
 - CORS поддержка
 - **Prometheus метрики**
-- **Grafana дашборды**
-- **Горизонтальное масштабирование** (поддержка нескольких экземпляров)
+- **Grafana** (контейнер в профиле `monitoring` / `scalable`; готовые дашборды в репозитории не поставляются — настраиваются вручную)
+- **Горизонтальное масштабирование** (пример в `docker-compose.scalable.yml` и Nginx; несколько экземпляров приложения за балансировщиком)
 - **Оптимизация для высокой нагрузки** (connection pooling, индексы БД)
 
 ## Быстрый старт с Docker
@@ -39,7 +40,7 @@ cd go_oauth2_server
 
 ### 2. Запустите с помощью Docker Compose:
 ```bash
-# Быстрый запуск (только OAuth2 + PostgreSQL)
+# Быстрый запуск через docker-compose.simple.yml (OAuth2 + PostgreSQL + Adminer)
 ./scripts/quick-start.sh
 
 # Запуск с мониторингом (OAuth2 + PostgreSQL + Prometheus + Grafana)
@@ -168,8 +169,8 @@ docker-compose up --force-recreate --build
 # Полная очистка и перезапуск
 ./scripts/clean-restart.sh
 
-# Быстрый перезапуск
-./scripts/restart-fixed.sh
+# Быстрый перезапуск с пересборкой
+./scripts/restart-with-tokens.sh
 ```
 
 ### Мониторинг:
@@ -180,11 +181,13 @@ docker-compose up --force-recreate --build
 # Проверка метрик
 curl http://localhost:8080/metrics
 
-# Доступ к Prometheus
-open http://localhost:9090
+# Доступ к Prometheus (в браузере)
+# macOS: open http://localhost:9090
+# Linux: xdg-open http://localhost:9090
 
 # Доступ к Grafana
-open http://localhost:3000
+# macOS: open http://localhost:3000
+# Linux: xdg-open http://localhost:3000
 ```
 
 ## Мониторинг
@@ -254,6 +257,27 @@ Content-Type: application/json
 }
 ```
 
+## Роли пользователей
+
+Роли хранятся в поле `users.roles` (тип `TEXT[]`) и добавляются в JWT access token в claim `roles`.
+
+Текущие стандартные роли (см. `internal/models/roles.go`):
+
+- `ROLE_USER` - базовая роль пользователя (роль по умолчанию при регистрации)
+- `ROLE_EDITOR` - роль редактора
+- `ROLE_ADMIN` - административная роль
+- `ROLE_SUPER_ADMIN` - расширенные административные права
+
+Поведение по умолчанию:
+
+- При регистрации пользователя без явного списка ролей назначается `ROLE_USER`
+- При интроспекции токена (`/introspect`) роли возвращаются в поле `roles`
+
+Тестовые пользователи из миграций:
+
+- `admin`: `ROLE_SUPER_ADMIN`, `ROLE_ADMIN`, `ROLE_EDITOR`, `ROLE_USER`
+- `developer`: `ROLE_EDITOR`, `ROLE_USER`
+
 ### 5. Authorization Code Grant
 ```bash
 # Шаг 1: Получение authorization code
@@ -304,24 +328,32 @@ Content-Type: application/json
 ## Структура проекта
 
 ```
-oauth2-server/
-├── cmd/server/main.go          # Точка входа
+go_oauth2_server/
+├── cmd/server/
+│   ├── main.go                 # Точка входа (релизная сборка, тег //go:build !debug)
+│   └── main.debug.go           # Упрощённая отладочная точка входа (тег //go:build debug)
 ├── internal/
-│   ├── config/config.go        # Конфигурация
-│   ├── handlers/handlers.go    # HTTP хендлеры
-│   ├── models/models.go        # Модели данных
-│   └── storage/postgres.go     # Работа с БД
-├── migrations/                 # Миграции БД
-│   ├── 001_initial.up.sql
-│   └── 001_initial.down.sql
-├── monitoring/                 # Конфигурация мониторинга
+│   ├── config/                 # Конфигурация
+│   ├── handlers/               # HTTP-хендлеры и OAuth2
+│   ├── jwt/                    # Генерация JWT access-токенов
+│   ├── models/                 # Модели и DTO
+│   └── storage/                # PostgreSQL и хранилища токенов/клиентов
+├── migrations/                 # SQL-миграции (несколько версий, см. каталог)
+├── monitoring/
 │   └── prometheus.yml
-├── scripts/                    # Скрипты для Docker
-├── docker-compose.yml          # Docker Compose конфигурация
-├── Dockerfile                  # Docker образ
-├── .env                        # Переменные окружения
-├── go.mod                      # Зависимости Go
-└── README.md                   # Документация
+├── docs/                       # Swagger (swag) и артефакты документации
+├── tests/                      # Интеграционные тесты
+├── testutil/                   # Вспомогательные утилиты для тестов
+├── scripts/                    # Скрипты запуска и обслуживания
+├── docker-compose.yml          # Основной Compose (OAuth2 + PostgreSQL; мониторинг — профили)
+├── docker-compose.simple.yml   # Упрощённый стек
+├── docker-compose.scalable.yml # Пример с Nginx и масштабированием
+├── docker-compose.test.yml     # Тесты в контейнере
+├── Dockerfile
+├── Makefile
+├── .env.example                # Пример переменных окружения (скопируйте в .env при необходимости)
+├── go.mod
+└── README.md
 ```
 
 ## Устранение неполадок
@@ -409,7 +441,7 @@ oauth2-server/
    ```bash
    # Проверьте URL в Grafana: http://prometheus:9090
    # Проверьте сеть Docker
-   docker network inspect go_oauth2_server_oauth2-network
+   docker network ls   # имя сети обычно <имя_каталога_проекта>_oauth2-network
    ```
 
 ### Проблемы с локальной разработкой:
@@ -484,12 +516,10 @@ docker-compose --profile scalable -f docker-compose.scalable.yml scale oauth2-se
 
 ### Ожидаемая производительность
 
-- **Без оптимизаций:** ~500-1000 RPS
-- **С оптимизациями:** ~5000-10000 RPS (зависит от железа и настройки БД)
+Цифры ниже **не являются результатами бенчмарков из этого репозитория** — это ориентировочный порядок величин; фактическая пропускная способность зависит от железа, схемы нагрузки и настроек PostgreSQL.
 
-### Детальный анализ
-
-Подробный анализ производительности и рекомендации по оптимизации см. в [docs/PERFORMANCE_ANALYSIS.md](docs/PERFORMANCE_ANALYSIS.md)
+- **Условно «базовый» сценарий:** порядка сотен–тысячи RPS (оценка)
+- **При донастройке БД и горизонтальном масштабировании:** потенциально выше (требует измерений на вашей среде)
 
 ## Лицензия
 

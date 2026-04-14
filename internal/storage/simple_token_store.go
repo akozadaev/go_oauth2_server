@@ -72,7 +72,7 @@ func (ts *SimpleTokenStore) RemoveByRefresh(ctx context.Context, refresh string)
 }
 
 // RemoveByCode удаляет токен по authorization code
-func (ts *SimpleTokenStore) RemoveByCode(ctx context.Context, code string) error {
+func (ts *SimpleTokenStore) RemoveByCode(_ context.Context, _ string) error {
 	// В нашей реализации authorization codes хранятся отдельно
 	return nil
 }
@@ -178,7 +178,7 @@ func (ts *SimpleTokenStore) GetByRefresh(ctx context.Context, refresh string) (o
 }
 
 // GetByCode получает токен по authorization code
-func (ts *SimpleTokenStore) GetByCode(ctx context.Context, code string) (oauth2.TokenInfo, error) {
+func (ts *SimpleTokenStore) GetByCode(_ context.Context, _ string) (oauth2.TokenInfo, error) {
 	return nil, nil
 }
 

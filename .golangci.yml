@@ -1,3 +1,5 @@
+version: "2"
+
 run:
   timeout: 5m
   tests: true
@@ -12,7 +14,9 @@ issues:
 
 output:
   formats:
-    - format: colored-line-number
+    text:
+      path: stdout
+      colors: true
 
 linters:
   enable:
@@ -20,13 +24,10 @@ linters:
     - revive
     - errcheck
     - staticcheck
-    - gosimple
     - unused
-    - typecheck
     #    - structcheck
     #    - deadcode
     - gocritic
-    - gofmt
 #    - goimports
     - bodyclose
   #    - exportloopref
@@ -43,4 +44,3 @@ linters-settings:
       - name: indent-error-flow
       - name: var-naming
         arguments: [ [ "API", "ASCII", "CPU", "CSS", "DNS", "EOF", "GUID", "HTML", "HTTP", "HTTPS", "ID", "IP", "JSON", "QPS", "RAM", "RPC", "SLA", "SMTP", "SQL", "SSH", "TCP", "TLS", "TTL", "UDP", "UI", "UID", "UUID", "URI", "URL", "UTF8", "VM", "XML", "XSRF", "XSS" ] ]
-

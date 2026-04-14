@@ -1,3 +1,4 @@
+// Package config загружает конфигурацию приложения из переменных окружения.
 package config
 
 import (
@@ -6,6 +7,7 @@ import (
 	"time"
 )
 
+// Config описывает runtime-настройки сервера OAuth2.
 type Config struct {
 	Port              string
 	DatabaseURL       string
@@ -15,6 +17,7 @@ type Config struct {
 	LogLevel          string
 }
 
+// Load читает переменные окружения и возвращает конфигурацию приложения.
 func Load() *Config {
 	tokenExp, _ := strconv.Atoi(getEnv("TOKEN_EXPIRATION_MINUTES", "60"))
 	refreshExp, _ := strconv.Atoi(getEnv("REFRESH_EXPIRATION_HOURS", "168")) // 7 дней

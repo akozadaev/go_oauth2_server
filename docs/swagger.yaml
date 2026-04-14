@@ -54,6 +54,10 @@ definitions:
         type: string
       exp:
         type: integer
+      roles:
+        items:
+          type: string
+        type: array
       scope:
         type: string
       user_id:
@@ -94,29 +98,75 @@ info:
   contact: {}
 paths:
   /authorize:
-    post:
+    get:
       consumes:
       - application/json
-      description: Авторизация пользователя с передачей формы
+      description: OAuth2 endpoint авторизации. Поддерживает GET (браузерный flow)
+        и POST (JSON с параметрами запроса).
       produces:
       - text/html
+      - application/json
       responses:
+        "302":
+          description: Редирект на callback с authorization code
+          schema:
+            type: string
         "400":
-          description: 'Неверный запрос. Пример:'
+          description: Неверный запрос
           schema:
             additionalProperties:
               type: string
             type: object
         "401":
-          description: 'Ошибка авторизации:'
+          description: Ошибка авторизации
           schema:
             additionalProperties:
               type: string
             type: object
-      summary: Авторизация (POST)
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Авторизация пользователя
       tags:
       - authorize
-  /clients/register:
+    post:
+      consumes:
+      - application/json
+      description: OAuth2 endpoint авторизации. Поддерживает GET (браузерный flow)
+        и POST (JSON с параметрами запроса).
+      produces:
+      - text/html
+      - application/json
+      responses:
+        "302":
+          description: Редирект на callback с authorization code
+          schema:
+            type: string
+        "400":
+          description: Неверный запрос
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Ошибка авторизации
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Авторизация пользователя
+      tags:
+      - authorize
+  /clients:
     post:
       consumes:
       - application/json
@@ -222,25 +272,30 @@ paths:
   /token:
     post:
       consumes:
-      - application/json
-      description: АОбмен кода на токен
+      - application/x-www-form-urlencoded
+      description: OAuth2 token endpoint для обмена authorization code на access token.
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Успешный ответ с токенами
           schema:
-            additionalProperties:
-              type: string
+            additionalProperties: true
             type: object
         "400":
-          description: 'Неверный запрос. Пример:'
+          description: Неверный запрос
           schema:
             additionalProperties:
               type: string
             type: object
         "401":
-          description: 'Ошибка авторизации:'
+          description: Ошибка авторизации
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
           schema:
             additionalProperties:
               type: string
@@ -248,7 +303,7 @@ paths:
       summary: Обмен кода на токен
       tags:
       - token
-  /users/register:
+  /users:
     post:
       consumes:
       - application/json

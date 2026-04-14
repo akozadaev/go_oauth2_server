@@ -16,21 +16,28 @@ const docTemplate = `{
     "basePath": "{{.BasePath}}",
     "paths": {
         "/authorize": {
-            "post": {
-                "description": "Авторизация пользователя с передачей формы",
+            "get": {
+                "description": "OAuth2 endpoint авторизации. Поддерживает GET (браузерный flow) и POST (JSON с параметрами запроса).",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
-                    "text/html"
+                    "text/html",
+                    "application/json"
                 ],
                 "tags": [
                     "authorize"
                 ],
-                "summary": "Авторизация (POST)",
+                "summary": "Авторизация пользователя",
                 "responses": {
+                    "302": {
+                        "description": "Редирект на callback с authorization code",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "400": {
-                        "description": "Неверный запрос. Пример:",
+                        "description": "Неверный запрос",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -39,7 +46,65 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Ошибка авторизации:",
+                        "description": "Ошибка авторизации",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "OAuth2 endpoint авторизации. Поддерживает GET (браузерный flow) и POST (JSON с параметрами запроса).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "text/html",
+                    "application/json"
+                ],
+                "tags": [
+                    "authorize"
+                ],
+                "summary": "Авторизация пользователя",
+                "responses": {
+                    "302": {
+                        "description": "Редирект на callback с authorization code",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Ошибка авторизации",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -50,7 +115,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/clients/register": {
+        "/clients": {
             "post": {
                 "description": "Создание нового OAuth2 клиента с автоматической генерацией учетных данных",
                 "consumes": [
@@ -206,9 +271,9 @@ const docTemplate = `{
         },
         "/token": {
             "post": {
-                "description": "АОбмен кода на токен",
+                "description": "OAuth2 token endpoint для обмена authorization code на access token.",
                 "consumes": [
-                    "application/json"
+                    "application/x-www-form-urlencoded"
                 ],
                 "produces": [
                     "application/json"
@@ -219,16 +284,14 @@ const docTemplate = `{
                 "summary": "Обмен кода на токен",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Успешный ответ с токенами",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "additionalProperties": true
                         }
                     },
                     "400": {
-                        "description": "Неверный запрос. Пример:",
+                        "description": "Неверный запрос",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -237,7 +300,16 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Ошибка авторизации:",
+                        "description": "Ошибка авторизации",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -248,7 +320,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/users/register": {
+        "/users": {
             "post": {
                 "description": "Создание учетной записи нового пользователя в системе",
                 "consumes": [
@@ -364,6 +436,12 @@ const docTemplate = `{
                 },
                 "exp": {
                     "type": "integer"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "scope": {
                     "type": "string"

@@ -1,11 +1,11 @@
 # Makefile для OAuth2 сервера
-.PHONY: help tools generate build release fmt test test-coverage lint-full lint-fix check clean-all clean-deps clean-deps-safe fix-network vendor stop-conflicts docker-build docker-build-simple docker-build-offline up up-simple up-no-build down logs logs-server logs-db logs-redis logs-fixed status restart restart-server check-ports shell db-shell redis-shell shell-fixed docker-test diagnose diagnose-container health quick-start quick-start-simple quick-start-fixed debug dev clean-tokens show-tokens count-tokens fix-perms test-unit test-integration test-docker test-docker-compose
+.PHONY: help tools generate build build-debug release fmt test test-coverage lint-full lint-fix check clean-all clean-deps clean-deps-safe fix-network vendor stop-conflicts docker-build docker-build-simple up up-simple up-no-build down logs logs-server logs-db status restart restart-server check-ports shell db-shell diagnose diagnose-container health doc quick-start quick-start-simple debug dev clean-tokens show-tokens count-tokens fix-perms test-unit test-integration test-docker test-docker-compose
 
 # ==================== РАЗРАБОТКА ====================
 
 tools: ## 🛠 Установка всех утилит
 	go install github.com/mgechev/revive@latest
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.8.0
 
 generate: ## 📦 Генерация всего, что помечено //go:generate
 	go generate ./...
@@ -23,8 +23,8 @@ release: ## 📦 Сборка для продакшена (Linux AMD64)
 fmt: ## 🧹 Форматирование gofmt (автоисправление)
 	gofmt -s -w .
 
-test: ## 🧪 Тестирование (локально)
-	go test -v ./...
+test: ## 🧪 Тестирование (локально; Docker поднимает Postgres — см. логи testutil)
+	go test -count=1 -timeout=15m -v ./...
 
 test-coverage: ## 🧪 Покрытие тестами
 	go test -cover -coverprofile=coverage.out ./...
@@ -33,11 +33,15 @@ test-coverage: ## 🧪 Покрытие тестами
 lint-full: ## 🧼 Полный линтинг с golangci-lint
 	@if ! [ -x "$$(command -v golangci-lint)" ]; then \
 		echo "Installing golangci-lint..."; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.61.0; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v2.8.0; \
 	fi
 	golangci-lint run ./...
 
 lint-fix: ## 🧼 Автофиксы линтера
+	@if ! [ -x "$$(command -v golangci-lint)" ]; then \
+		echo "Installing golangci-lint..."; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin v2.8.0; \
+	fi
 	golangci-lint run --fix ./...
 
 check: fmt lint-full test ## 🧪 Финальная проверка перед коммитом
@@ -73,7 +77,6 @@ clean-all: ## 🧹 Полная очистка Docker
 stop-conflicts: ## 🛑 Остановить конфликтующие процессы
 	@echo "🔍 Остановка конфликтующих процессов..."
 	-sudo lsof -ti :5433 | xargs sudo kill -9 2>/dev/null || true
-	-sudo lsof -ti :6380 | xargs sudo kill -9 2>/dev/null || true
 	-sudo lsof -ti :8080 | xargs sudo kill -9 2>/dev/null || true
 	-docker stop $$(docker ps -aq --filter "name=oauth2") 2>/dev/null || true
 	-docker rm $$(docker ps -aq --filter "name=oauth2") 2>/dev/null || true
@@ -90,11 +93,6 @@ docker-build-simple: clean-all ## 🔨 Собрать простые Docker об
 	@echo "🔨 Сборка простых Docker образов..."
 	docker-compose -f docker-compose.simple.yml build --no-cache --force-rm
 	@echo "✅ Простые Docker образы собраны"
-
-docker-build-fixed: clean-all clean-deps ## 🔨 Собрать исправленные Docker образы
-	@echo "🔨 Сборка исправленных Docker образов..."
-	docker build -f Dockerfile.fixed -t oauth2-server:fixed --no-cache .
-	@echo "✅ Исправленные Docker образы собраны"
 
 up: stop-conflicts docker-build ## 🚀 Запустить все сервисы
 	@echo "🚀 Запуск сервисов..."
@@ -113,23 +111,6 @@ up-simple: stop-conflicts docker-build-simple ## 🚀 Запустить про�
 	@sleep 20
 	@echo "📋 Логи OAuth2 сервера:"
 	@docker-compose -f docker-compose.simple.yml logs oauth2-server
-	@echo ""
-	@echo "🔍 Проверка health endpoint:"
-	@curl -s http://localhost:8080/health || echo "❌ Health endpoint недоступен"
-
-up-fixed: stop-conflicts docker-build-fixed ## 🚀 Запустить исправленную версию
-	@echo "🚀 Запуск исправленной версии сервисов..."
-	docker run -d --name oauth2-server-fixed \
-		-p 8080:8080 \
-		-e PORT=8080 \
-		-e DATABASE_URL="postgres://oauth2_user:oauth2_password@host.docker.internal:5433/oauth2_db?sslmode=disable" \
-		-e JWT_SECRET="your-super-secret-jwt-key-change-this-in-production-make-it-at-least-32-characters-long" \
-		-e LOG_LEVEL=debug \
-		oauth2-server:fixed
-	@echo "⏳ Ожидание готовности сервиса (20 секунд)..."
-	@sleep 20
-	@echo "📋 Логи исправленной версии:"
-	@docker logs oauth2-server-fixed
 	@echo ""
 	@echo "🔍 Проверка health endpoint:"
 	@curl -s http://localhost:8080/health || echo "❌ Health endpoint недоступен"
@@ -156,19 +137,12 @@ logs-server: ## 📋 Показать логи OAuth2 сервера
 logs-db: ## 📋 Показать логи PostgreSQL
 	docker-compose logs -f postgres
 
-logs-redis: ## 📋 Показать логи Redis
-	docker-compose logs -f redis
-
-logs-fixed: ## 📋 Показать логи исправленной версии
-	docker logs -f oauth2-server-fixed
-
 status: ## 📊 Показать статус сервисов
 	@echo "📊 Статус сервисов:"
 	docker-compose ps
 	@echo ""
 	@echo "🏥 Health Check статусы:"
 	@docker inspect oauth2-postgres --format='PostgreSQL: {{.State.Health.Status}}' 2>/dev/null || echo "PostgreSQL: unknown"
-	@docker inspect oauth2-redis --format='Redis: {{.State.Health.Status}}' 2>/dev/null || echo "Redis: unknown"
 	@docker inspect oauth2-server --format='OAuth2 Server: {{.State.Health.Status}}' 2>/dev/null || echo "OAuth2 Server: unknown"
 
 restart: ## 🔄 Перезапустить все сервисы
@@ -185,8 +159,6 @@ check-ports: ## 🔌 Проверить занятые порты
 	@echo "🔍 Проверка портов:"
 	@echo "Порт 5433 (PostgreSQL):"
 	@nc -z localhost 5433 && echo "  ✅ Доступен" || echo "  ❌ Недоступен"
-	@echo "Порт 6380 (Redis):"
-	@nc -z localhost 6380 && echo "  ✅ Доступен" || echo "  ❌ Недоступен"
 	@echo "Порт 8080 (OAuth2):"
 	@nc -z localhost 8080 && echo "  ✅ Доступен" || echo "  ❌ Недоступен"
 
@@ -195,15 +167,6 @@ shell: ## 🐚 Подключиться к OAuth2 серверу
 
 db-shell: ## 🐚 Подключиться к PostgreSQL
 	docker-compose exec postgres psql -U oauth2_user -d oauth2_db
-
-redis-shell: ## 🐚 Подключиться к Redis
-	docker-compose exec redis redis-cli -a redis_password
-
-shell-fixed: ## 🐚 Подключиться к исправленной версии
-	docker exec -it oauth2-server-fixed sh
-
-docker-test: ## 🧪 Запустить тесты в Docker
-	docker-compose exec oauth2-server go test ./... -v
 
 diagnose: ## 🔍 Полная диагностика системы
 	@chmod +x scripts/diagnose.sh
@@ -222,6 +185,7 @@ health: ## 🏥 Проверить health endpoint
 doc: ## 📚 Генерация Swagger-документации
 	go install github.com/swaggo/swag/cmd/swag@latest
 	swag init -g cmd/server/main.go --dir . --pd --parseGoList=false --parseDepth=2 -o ./docs
+# 	swag init -g cmd/server/main.go --dir . --pd --parseInternal --parseDepth 2 -o ./docs
 
 # ==================== ТОКЕНЫ ====================
 
@@ -265,7 +229,6 @@ quick-start: ## 🚀 Быстрый старт
 	@echo "   OAuth2 Server: http://localhost:8080"
 	@echo "   Health Check:  http://localhost:8080/health"
 	@echo "   PostgreSQL:    localhost:5433"
-	@echo "   Redis:         localhost:6380"
 
 quick-start-simple: ## 🚀 Быстрый старт простой версии
 	@echo "🚀 Быстрый старт простой версии OAuth2 сервера..."
@@ -274,15 +237,6 @@ quick-start-simple: ## 🚀 Быстрый старт простой верси�
 	@echo "🌐 Доступные URL:"
 	@echo "   OAuth2 Server: http://localhost:8080"
 	@echo "   PostgreSQL:    localhost:5433"
-	@echo "   Redis:         localhost:6380"
-
-quick-start-fixed: ## 🚀 Быстрый старт исправленной версии
-	@echo "🚀 Быстрый старт исправленной версии OAuth2 сервера..."
-	@make up-fixed
-	@echo ""
-	@echo "🌐 Доступные URL:"
-	@echo "   OAuth2 Server: http://localhost:8080"
-	@echo "   Health Check:  http://localhost:8080/health"
 
 debug: ## 🐛 Режим отладки
 	@echo "🐛 Запуск в режиме отладки..."
@@ -292,14 +246,13 @@ debug: ## 🐛 Режим отладки
 dev: ## 👨‍💻 Режим разработки (локальная сборка + Docker БД)
 	@echo "👨‍💻 Запуск в режиме разработки..."
 	@make stop-conflicts
-	@docker-compose up -d postgres redis
+	@docker-compose up -d postgres
 	@echo "⏳ Ожидание готовности БД..."
 	@sleep 10
 	@echo "🔨 Локальная сборка..."
 	@make build
 	@echo "🚀 Запуск локального сервера..."
 	@DATABASE_URL="postgres://oauth2_user:oauth2_password@localhost:5433/oauth2_db?sslmode=disable" \
-	 REDIS_URL="redis://:redis_password@localhost:6380/0" \
 	 ./go_oauth2_server
 
 fix-perms:

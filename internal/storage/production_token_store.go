@@ -110,7 +110,7 @@ func (ts *ProductionTokenStore) GetByAccess(ctx context.Context, access string) 
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			ts.logger.Debug("Token not found or expired", "access_token_prefix", access[:min(8, len(access))])
+			ts.logger.Debug("Token not found or expired", "access_token_prefix", access[:minInt(8, len(access))])
 			return nil, nil
 		}
 		ts.logger.Error("Failed to get token by access", "error", err)
@@ -238,13 +238,13 @@ func (ts *ProductionTokenStore) RemoveByRefresh(ctx context.Context, refresh str
 }
 
 // RemoveByCode удаляет токен по authorization code
-func (ts *ProductionTokenStore) RemoveByCode(ctx context.Context, code string) error {
+func (ts *ProductionTokenStore) RemoveByCode(_ context.Context, _ string) error {
 	// В нашей реализации authorization codes хранятся отдельно
 	return nil
 }
 
 // GetByCode получает токен по authorization code
-func (ts *ProductionTokenStore) GetByCode(ctx context.Context, code string) (oauth2.TokenInfo, error) {
+func (ts *ProductionTokenStore) GetByCode(_ context.Context, _ string) (oauth2.TokenInfo, error) {
 	return nil, nil
 }
 
@@ -306,7 +306,7 @@ func (ts *ProductionTokenStore) GetTokenStats(ctx context.Context) (map[string]i
 }
 
 // Helper function for min
-func min(a, b int) int {
+func minInt(a, b int) int {
 	if a < b {
 		return a
 	}

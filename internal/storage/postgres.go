@@ -1,3 +1,4 @@
+// Package storage реализует хранилища OAuth2-клиентов, пользователей и токенов.
 package storage
 
 import (
@@ -11,9 +12,11 @@ import (
 
 	"github.com/go-oauth2/oauth2/v4"
 	oauthModels "github.com/go-oauth2/oauth2/v4/models"
+	"github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
 
+// PostgresStore инкапсулирует доступ к PostgreSQL для пользователей, клиентов и токенов OAuth2.
 type PostgresStore struct {
 	db          *sql.DB
 	clientStore oauth2.ClientStore
@@ -21,6 +24,7 @@ type PostgresStore struct {
 	logger      *slog.Logger
 }
 
+// NewPostgresStore создает хранилище данных на PostgreSQL.
 func NewPostgresStore(db *sql.DB) *PostgresStore {
 	logger := slog.Default()
 	// ClientStore теперь stateless (без in-memory кеша) для поддержки горизонтального масштабирования
@@ -40,18 +44,22 @@ func NewPostgresStore(db *sql.DB) *PostgresStore {
 	}
 }
 
+// GetClientStore возвращает реализацию oauth2.ClientStore.
 func (s *PostgresStore) GetClientStore() oauth2.ClientStore {
 	return s.clientStore
 }
 
+// GetTokenStore возвращает реализацию oauth2.TokenStore.
 func (s *PostgresStore) GetTokenStore() oauth2.TokenStore {
 	return s.tokenStore
 }
 
+// Ping проверяет доступность подключения к базе данных.
 func (s *PostgresStore) Ping(ctx context.Context) error {
 	return s.db.PingContext(ctx)
 }
 
+// CreateClient сохраняет клиента OAuth2 в базе данных.
 func (s *PostgresStore) CreateClient(ctx context.Context, client *models.Client) error {
 	query := `
         INSERT INTO clients (id, secret, domain, user_id, created_at)
@@ -65,6 +73,7 @@ func (s *PostgresStore) CreateClient(ctx context.Context, client *models.Client)
 	return nil
 }
 
+// GetClient загружает клиента OAuth2 по идентификатору.
 func (s *PostgresStore) GetClient(ctx context.Context, clientID string) (*models.Client, error) {
 	client := &models.Client{}
 	query := `
@@ -81,39 +90,63 @@ func (s *PostgresStore) GetClient(ctx context.Context, clientID string) (*models
 	return client, nil
 }
 
+// CreateUser создает пользователя с хешированным паролем.
 func (s *PostgresStore) CreateUser(ctx context.Context, user *models.User) error {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
 
+	roles := user.Roles
+	if len(roles) == 0 {
+		roles = models.DefaultUserRoles()
+	}
+
 	query := `
-        INSERT INTO users (id, username, password, created_at)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO users (id, username, password, created_at, roles)
+        VALUES ($1, $2, $3, $4, $5)
     `
-	_, err = s.db.ExecContext(ctx, query, user.ID, user.Username, string(hashedPassword), user.CreatedAt)
+	_, err = s.db.ExecContext(ctx, query, user.ID, user.Username, string(hashedPassword), user.CreatedAt, pq.Array(roles))
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
+	user.Roles = roles
 	return nil
 }
 
+// GetUser загружает пользователя по имени.
 func (s *PostgresStore) GetUser(ctx context.Context, username string) (*models.User, error) {
 	user := &models.User{}
+	var roles pq.StringArray
 	query := `
-        SELECT id, username, password, created_at
+        SELECT id, username, password, created_at, roles
         FROM users
         WHERE username = $1
     `
 	err := s.db.QueryRowContext(ctx, query, username).Scan(
-		&user.ID, &user.Username, &user.Password, &user.CreatedAt,
+		&user.ID, &user.Username, &user.Password, &user.CreatedAt, &roles,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
+	user.Roles = append([]string(nil), []string(roles)...)
 	return user, nil
 }
 
+// GetUserRolesByID возвращает роли пользователя по id (для выдачи JWT).
+func (s *PostgresStore) GetUserRolesByID(ctx context.Context, id string) ([]string, error) {
+	var roles pq.StringArray
+	err := s.db.QueryRowContext(ctx, `SELECT roles FROM users WHERE id = $1`, id).Scan(&roles)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("user not found: %w", err)
+		}
+		return nil, fmt.Errorf("failed to get user roles: %w", err)
+	}
+	return append([]string(nil), []string(roles)...), nil
+}
+
+// ValidateUser проверяет учетные данные пользователя.
 func (s *PostgresStore) ValidateUser(ctx context.Context, username, password string) (*models.User, error) {
 	user, err := s.GetUser(ctx, username)
 	if err != nil {
@@ -128,6 +161,7 @@ func (s *PostgresStore) ValidateUser(ctx context.Context, username, password str
 	return user, nil
 }
 
+// ValidateClient проверяет учетные данные OAuth2-клиента.
 func (s *PostgresStore) ValidateClient(ctx context.Context, clientID, clientSecret string) (*models.Client, error) {
 	client, err := s.GetClient(ctx, clientID)
 	if err != nil {
@@ -181,6 +215,7 @@ type ClientStore struct {
 	logger *slog.Logger
 }
 
+// GetByID возвращает клиента по id из базы данных.
 func (cs *ClientStore) GetByID(ctx context.Context, id string) (oauth2.ClientInfo, error) {
 	// Всегда обращаемся к БД для поддержки горизонтального масштабирования
 	// PRIMARY KEY на id обеспечивает быстрый поиск
@@ -218,7 +253,8 @@ func (cs *ClientStore) GetByID(ctx context.Context, id string) (oauth2.ClientInf
 	return client, nil
 }
 
-func (cs *ClientStore) Set(ctx context.Context, id string, client oauth2.ClientInfo) error {
+// Set реализует интерфейс oauth2.ClientStore и является no-op для stateless-хранилища.
+func (cs *ClientStore) Set(_ context.Context, id string, _ oauth2.ClientInfo) error {
 	// Метод Set больше не используется для кеширования,
 	// так как мы всегда обращаемся к БД напрямую
 	// Оставлен для совместимости с интерфейсом oauth2.ClientStore

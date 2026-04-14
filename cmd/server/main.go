@@ -1,5 +1,6 @@
 //go:build !debug
 
+// Package main запускает HTTP OAuth2 сервер.
 package main
 
 import (
@@ -105,7 +106,11 @@ func run() error {
 		logger.Error("Failed to connect to database", "error", err)
 		return err
 	}
-	defer db.Close()
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil {
+			logger.Error("Failed to close database connection", "error", closeErr)
+		}
+	}()
 
 	// Настройка connection pooling для высокой нагрузки
 	db.SetMaxOpenConns(25)
@@ -207,7 +212,9 @@ func runMigrations(databaseURL string) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {

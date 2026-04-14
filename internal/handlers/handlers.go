@@ -1,3 +1,4 @@
+// Package handlers реализует HTTP-обработчики OAuth2 endpoint-ов.
 package handlers
 
 import (
@@ -20,6 +21,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// Handler реализует HTTP endpoint-ы OAuth2 сервера.
 type Handler struct {
 	store  *storage.PostgresStore
 	logger *slog.Logger
@@ -27,6 +29,7 @@ type Handler struct {
 	config *config.Config
 }
 
+// New создает HTTP-обработчики OAuth2 и настраивает сервер выдачи токенов.
 func New(store *storage.PostgresStore, logger *slog.Logger, cfg *config.Config) *Handler {
 	manager := manage.NewDefaultManager()
 
@@ -34,8 +37,13 @@ func New(store *storage.PostgresStore, logger *slog.Logger, cfg *config.Config) 
 	manager.SetAuthorizeCodeTokenCfg(manage.DefaultAuthorizeCodeTokenCfg)
 	manager.SetRefreshTokenCfg(manage.DefaultRefreshTokenCfg)
 
-	// Генерация JWT access токенов
-	jwtGen := jwt.NewJWTAccessGenerate([]byte(cfg.JWTSecret), jwtLib.SigningMethodHS256)
+	// Генерация JWT access токенов (claim `roles` из БД по user_id)
+	jwtGen := jwt.NewAccessGenerate([]byte(cfg.JWTSecret), jwtLib.SigningMethodHS256, func(ctx context.Context, userID string) ([]string, error) {
+		if userID == "" {
+			return []string{}, nil
+		}
+		return store.GetUserRolesByID(ctx, userID)
+	})
 	manager.MapAccessGenerate(jwtGen)
 
 	// Хранилище клиентов
@@ -49,7 +57,7 @@ func New(store *storage.PostgresStore, logger *slog.Logger, cfg *config.Config) 
 	srv.SetClientInfoHandler(server.ClientFormHandler)
 
 	// Обработка авторизации по логину и паролю
-	srv.SetPasswordAuthorizationHandler(func(ctx context.Context, clientID, username, password string) (userID string, err error) {
+	srv.SetPasswordAuthorizationHandler(func(ctx context.Context, _ string, username, password string) (userID string, err error) {
 		user, err := store.ValidateUser(ctx, username, password)
 		if err != nil {
 			return "", err
@@ -58,12 +66,12 @@ func New(store *storage.PostgresStore, logger *slog.Logger, cfg *config.Config) 
 	})
 
 	// Обработка пользовательской авторизации
-	srv.SetUserAuthorizationHandler(func(w http.ResponseWriter, r *http.Request) (userID string, err error) {
+	srv.SetUserAuthorizationHandler(func(_ http.ResponseWriter, r *http.Request) (userID string, err error) {
 		return r.FormValue("user_id"), nil
 	})
 
 	// Обработка авторизации клиента
-	srv.SetClientAuthorizedHandler(func(clientID string, grant oauth2.GrantType) (allowed bool, err error) {
+	srv.SetClientAuthorizedHandler(func(_ string, _ oauth2.GrantType) (allowed bool, err error) {
 		// Разрешаем все grant типы для простоты — в проде стоит сделать полноценную проверку
 		return true, nil
 	})
@@ -76,43 +84,17 @@ func New(store *storage.PostgresStore, logger *slog.Logger, cfg *config.Config) 
 	}
 }
 
-// AuthorizeGet godoc
-// @Summary Авторизация (GET)
-// @Description Авторизация пользователя (через браузер)
+// Authorize godoc
+// @Summary Авторизация пользователя
+// @Description OAuth2 endpoint авторизации. Поддерживает GET (браузерный flow) и POST (JSON с параметрами запроса).
 // @Tags authorize
 // @Accept json
-// @Produce html
-// @Success 200 {string} string "HTML-форма"
-// @Failure 400 {object} map[string]string "Неверный запрос. Пример:
-// {
-//   \"error\": \"invalid_request\",
-//   \"error_description\": \"Missing parameters\"
-// }"
-// @Failure 401 {object} map[string]string "Ошибка авторизации:
-// {
-// \"error\": \"access_denied\",
-// \"error_description\": \"Invalid credentials\"
-// }"
+// @Produce html,json
+// @Success 302 {string} string "Редирект на callback с authorization code"
+// @Failure 400 {object} map[string]string "Неверный запрос"
+// @Failure 401 {object} map[string]string "Ошибка авторизации"
+// @Failure 500 {object} map[string]string "Внутренняя ошибка сервера"
 // @Router /authorize [get]
-
-// AuthorizePost godoc
-// @Summary Авторизация (POST)
-// @Description Авторизация пользователя с передачей формы
-// @Tags authorize
-// @Accept json
-// @Produce html
-// @Failure 400 {object} map[string]string "Неверный запрос. Пример:
-//
-//	{
-//	  \"error\": \"invalid_request\",
-//	  \"error_description\": \"Missing parameters\"
-//	}"
-//
-// @Failure 401 {object} map[string]string "Ошибка авторизации:
-// {
-// \"error\": \"access_denied\",
-// \"error_description\": \"Invalid credentials\"
-// }"
 // @Router /authorize [post]
 func (h *Handler) Authorize(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -161,28 +143,14 @@ func (h *Handler) Authorize(w http.ResponseWriter, r *http.Request) {
 
 // Token godoc
 // @Summary Обмен кода на токен
-// @Description АОбмен кода на токен
+// @Description OAuth2 token endpoint для обмена authorization code на access token.
 // @Tags token
-// @Accept json
+// @Accept x-www-form-urlencoded
 // @Produce json
-// @Success 200 {object} map[string]string
-//
-//	  \"error\": \"invalid_request\",
-//	  \"error_description\": \"Missing parameters\"
-//	}" "Успешный ответ с полной информацией о добавленных ссылках"
-//
-// @Failure 400 {object} map[string]string "Неверный запрос. Пример:
-//
-//	{
-//	  \"error\": \"invalid_request\",
-//	  \"error_description\": \"Missing parameters\"
-//	}"
-//
-// @Failure 401 {object} map[string]string "Ошибка авторизации:
-// {
-// \"error\": \"access_denied\",
-// \"error_description\": \"Invalid credentials\"
-// }"
+// @Success 200 {object} map[string]interface{} "Успешный ответ с токенами"
+// @Failure 400 {object} map[string]string "Неверный запрос"
+// @Failure 401 {object} map[string]string "Ошибка авторизации"
+// @Failure 500 {object} map[string]string "Внутренняя ошибка сервера"
 // @Router /token [post]
 func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
 	if err := h.srv.HandleTokenRequest(w, r); err != nil {
@@ -278,6 +246,11 @@ func (h *Handler) Introspect(w http.ResponseWriter, r *http.Request) {
 		Scope:    ti.GetScope(),
 		Exp:      expiresAt.Unix(),
 	}
+	if uid := ti.GetUserID(); uid != "" {
+		if roles, err := h.store.GetUserRolesByID(ctx, uid); err == nil {
+			response.Roles = roles
+		}
+	}
 
 	h.writeJSONResponse(w, response, http.StatusOK)
 }
@@ -324,8 +297,30 @@ func (h *Handler) validateJWTToken(tokenString string) models.IntrospectResponse
 		Active:   true,
 		ClientID: clientID,
 		UserID:   username,
+		Roles:    rolesFromJWTClaims(claims),
 		Scope:    "", // Сейчас не используем
 		Exp:      int64(exp),
+	}
+}
+
+func rolesFromJWTClaims(claims jwtLib.MapClaims) []string {
+	raw, ok := claims["roles"]
+	if !ok || raw == nil {
+		return nil
+	}
+	switch v := raw.(type) {
+	case []string:
+		return append([]string(nil), v...)
+	case []interface{}:
+		out := make([]string, 0, len(v))
+		for _, x := range v {
+			if s, ok := x.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	default:
+		return nil
 	}
 }
 
@@ -339,7 +334,7 @@ func (h *Handler) validateJWTToken(tokenString string) models.IntrospectResponse
 // @Success 201 {object} map[string]interface{} "Успешная регистрация клиента"
 // @Failure 400 {object} map[string]string "Неверный формат запроса"
 // @Failure 500 {object} map[string]string "Ошибка сервера"
-// @Router /clients/register [post]
+// @Router /clients [post]
 func (h *Handler) RegisterClient(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -413,7 +408,7 @@ func (h *Handler) RegisterClient(w http.ResponseWriter, r *http.Request) {
 // @Success 201 {object} map[string]interface{} "Успешная регистрация пользователя"
 // @Failure 400 {object} map[string]string "Неверный формат запроса или отсутствуют обязательные поля"
 // @Failure 500 {object} map[string]string "Ошибка сервера при создании пользователя"
-// @Router /users/register [post]
+// @Router /users [post]
 func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
