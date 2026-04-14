@@ -1,3 +1,4 @@
+# Конфиг для golangci-lint v2.8.x (CI и make lint-full ставят эту же версию).
 version: "2"
 
 run:

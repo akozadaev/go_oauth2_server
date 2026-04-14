@@ -3,9 +3,9 @@
 
 # ==================== РАЗРАБОТКА ====================
 
-tools: ## 🛠 Установка всех утилит
+tools: ## 🛠 Установка всех утилит (golangci-lint v2.8.0 — см. .golangci.yml version 2)
 	go install github.com/mgechev/revive@latest
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.8.0
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0
 
 generate: ## 📦 Генерация всего, что помечено //go:generate
 	go generate ./...
