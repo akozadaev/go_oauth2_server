@@ -1,3 +1,4 @@
+// Package models содержит структуры доменной модели и API-запросов.
 package models
 
 // ClientRegistrationRequest represents client registration request

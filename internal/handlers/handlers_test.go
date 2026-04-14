@@ -29,14 +29,14 @@ func TestMain(m *testing.M) {
 		log.Printf("Docker unavailable, skipping tests: %v", err)
 		os.Exit(0)
 	}
-	defer func() {
-		db.Close()
-		cleanup()
-	}()
 
 	handlersTestDB = db
 
 	code := m.Run()
+	if err := db.Close(); err != nil {
+		log.Printf("Failed to close DB: %v", err)
+	}
+	cleanup()
 	os.Exit(code)
 }
 

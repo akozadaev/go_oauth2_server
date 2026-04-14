@@ -33,14 +33,14 @@ func TestMain(m *testing.M) {
 		log.Printf("Docker unavailable, skipping tests: %v", err)
 		os.Exit(0)
 	}
-	defer func() {
-		db.Close()
-		cleanup()
-	}()
 
 	integrationTestDB = db
 
 	code := m.Run()
+	if err := db.Close(); err != nil {
+		log.Printf("Failed to close DB: %v", err)
+	}
+	cleanup()
 	os.Exit(code)
 }
 
@@ -85,6 +85,9 @@ func TestOAuth2Flow_Integration(t *testing.T) {
 	userJSON, _ := json.Marshal(userData)
 	userResp, err := http.Post(server.URL+"/users", "application/json", bytes.NewBuffer(userJSON))
 	require.NoError(t, err)
+	defer func() {
+		_ = userResp.Body.Close()
+	}()
 	assert.Equal(t, http.StatusCreated, userResp.StatusCode)
 
 	clientData := models.Client{
@@ -98,6 +101,9 @@ func TestOAuth2Flow_Integration(t *testing.T) {
 	clientJSON, _ := json.Marshal(clientData)
 	clientResp, err := http.Post(server.URL+"/clients", "application/json", bytes.NewBuffer(clientJSON))
 	require.NoError(t, err)
+	defer func() {
+		_ = clientResp.Body.Close()
+	}()
 	assert.Equal(t, http.StatusCreated, clientResp.StatusCode)
 
 	var clientRespData map[string]interface{}
@@ -116,6 +122,9 @@ func TestOAuth2Flow_Integration(t *testing.T) {
 
 	tokenResp, err := http.Post(server.URL+"/token", "application/x-www-form-urlencoded", strings.NewReader(tokenForm.Encode()))
 	require.NoError(t, err)
+	defer func() {
+		_ = tokenResp.Body.Close()
+	}()
 	assert.Equal(t, http.StatusOK, tokenResp.StatusCode)
 
 	var tokenResponse map[string]interface{}
@@ -136,12 +145,28 @@ func TestOAuth2Flow_Integration(t *testing.T) {
 	introspectJSON, _ := json.Marshal(introspectData)
 	introspectResp, err := http.Post(server.URL+"/introspect", "application/json", bytes.NewBuffer(introspectJSON))
 	require.NoError(t, err)
+	defer func() {
+		_ = introspectResp.Body.Close()
+	}()
 	assert.Equal(t, http.StatusOK, introspectResp.StatusCode)
 
 	var introspectResponse map[string]interface{}
 	err = json.NewDecoder(introspectResp.Body).Decode(&introspectResponse)
 	require.NoError(t, err)
 	assert.Equal(t, true, introspectResponse["active"])
+
+	rolesRaw, ok := introspectResponse["roles"]
+	require.True(t, ok, "introspect should include roles from JWT")
+	roles, ok := rolesRaw.([]interface{})
+	require.True(t, ok)
+	var hasUserRole bool
+	for _, r := range roles {
+		if s, ok := r.(string); ok && s == models.RoleUser {
+			hasUserRole = true
+			break
+		}
+	}
+	assert.True(t, hasUserRole, "password-grant user should have ROLE_USER in token/introspect")
 }
 
 func TestHealthCheck_Integration(t *testing.T) {
@@ -150,6 +175,9 @@ func TestHealthCheck_Integration(t *testing.T) {
 
 	resp, err := http.Get(server.URL + "/health")
 	require.NoError(t, err)
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var response map[string]interface{}
@@ -172,6 +200,9 @@ func TestUserRegistration_Integration(t *testing.T) {
 	userJSON, _ := json.Marshal(userData)
 	resp, err := http.Post(server.URL+"/users", "application/json", bytes.NewBuffer(userJSON))
 	require.NoError(t, err)
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
 	var response map[string]interface{}
@@ -195,6 +226,9 @@ func TestClientRegistration_Integration(t *testing.T) {
 	clientJSON, _ := json.Marshal(clientData)
 	resp, err := http.Post(server.URL+"/clients", "application/json", bytes.NewBuffer(clientJSON))
 	require.NoError(t, err)
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
 	var response map[string]interface{}

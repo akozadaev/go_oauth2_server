@@ -1,0 +1,10 @@
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS roles TEXT[] NOT NULL DEFAULT ARRAY['ROLE_USER']::TEXT[];
+
+UPDATE users
+SET roles = ARRAY['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR', 'ROLE_USER']
+WHERE username = 'admin';
+
+UPDATE users
+SET roles = ARRAY['ROLE_EDITOR', 'ROLE_USER']
+WHERE username = 'developer';

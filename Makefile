@@ -23,8 +23,8 @@ release: ## 📦 Сборка для продакшена (Linux AMD64)
 fmt: ## 🧹 Форматирование gofmt (автоисправление)
 	gofmt -s -w .
 
-test: ## 🧪 Тестирование (локально)
-	go test -v ./...
+test: ## 🧪 Тестирование (локально; Docker поднимает Postgres — см. логи testutil)
+	go test -count=1 -timeout=15m -v ./...
 
 test-coverage: ## 🧪 Покрытие тестами
 	go test -cover -coverprofile=coverage.out ./...
@@ -185,6 +185,7 @@ health: ## 🏥 Проверить health endpoint
 doc: ## 📚 Генерация Swagger-документации
 	go install github.com/swaggo/swag/cmd/swag@latest
 	swag init -g cmd/server/main.go --dir . --pd --parseGoList=false --parseDepth=2 -o ./docs
+# 	swag init -g cmd/server/main.go --dir . --pd --parseInternal --parseDepth 2 -o ./docs
 
 # ==================== ТОКЕНЫ ====================
 

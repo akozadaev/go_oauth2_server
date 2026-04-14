@@ -18,6 +18,7 @@ OAuth2 сервер на Go 1.23.4, на базе PostgreSQL с монитори
 - Refresh Token Grant
 - Регистрация клиентов
 - Авторизация пользователей
+- Роли пользователей в JWT claim `roles`
 - JWT токены с настраиваемым временем жизни
 - PostgreSQL база данных
 - Автоматические миграции БД
@@ -255,6 +256,27 @@ Content-Type: application/json
   "password": "testpass"
 }
 ```
+
+## Роли пользователей
+
+Роли хранятся в поле `users.roles` (тип `TEXT[]`) и добавляются в JWT access token в claim `roles`.
+
+Текущие стандартные роли (см. `internal/models/roles.go`):
+
+- `ROLE_USER` - базовая роль пользователя (роль по умолчанию при регистрации)
+- `ROLE_EDITOR` - роль редактора
+- `ROLE_ADMIN` - административная роль
+- `ROLE_SUPER_ADMIN` - расширенные административные права
+
+Поведение по умолчанию:
+
+- При регистрации пользователя без явного списка ролей назначается `ROLE_USER`
+- При интроспекции токена (`/introspect`) роли возвращаются в поле `roles`
+
+Тестовые пользователи из миграций:
+
+- `admin`: `ROLE_SUPER_ADMIN`, `ROLE_ADMIN`, `ROLE_EDITOR`, `ROLE_USER`
+- `developer`: `ROLE_EDITOR`, `ROLE_USER`
 
 ### 5. Authorization Code Grant
 ```bash

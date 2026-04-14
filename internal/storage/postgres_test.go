@@ -24,14 +24,14 @@ func TestMain(m *testing.M) {
 		log.Printf("Docker unavailable, skipping tests: %v", err)
 		os.Exit(0)
 	}
-	defer func() {
-		db.Close()
-		cleanup()
-	}()
 
 	storageTestDB = db
 
 	code := m.Run()
+	if err := db.Close(); err != nil {
+		log.Printf("Failed to close DB: %v", err)
+	}
+	cleanup()
 	os.Exit(code)
 }
 
@@ -86,6 +86,7 @@ func TestPostgresStore_CreateUser(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, retrievedUser)
 	assert.Equal(t, user.Username, retrievedUser.Username)
+	assert.Equal(t, []string{models.RoleUser}, retrievedUser.Roles)
 }
 
 func TestPostgresStore_ValidateUser(t *testing.T) {

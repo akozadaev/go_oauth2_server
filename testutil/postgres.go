@@ -1,12 +1,15 @@
+// Package testutil содержит вспомогательные утилиты для интеграционных тестов.
 package testutil
 
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
+	// PostgreSQL driver for database/sql.
 	_ "github.com/lib/pq"
 )
 
@@ -20,6 +23,7 @@ const (
 // Возвращает *sql.DB, функцию очистки и ошибку.
 // Функция очистки должна быть вызвана (например, через defer) после завершения тестов.
 func StartPostgres() (*sql.DB, func(), error) {
+	log.Println("testutil: connecting to Docker daemon…")
 	pool, err := dockertest.NewPool("")
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not construct pool: %w", err)
@@ -30,6 +34,7 @@ func StartPostgres() (*sql.DB, func(), error) {
 		return nil, nil, fmt.Errorf("could not connect to Docker: %w", err)
 	}
 
+	log.Println("testutil: starting postgres:15-alpine (first run may take several minutes while the image is pulled)…")
 	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Repository: "postgres",
 		Tag:        "15-alpine",
@@ -53,6 +58,7 @@ func StartPostgres() (*sql.DB, func(), error) {
 	dbURL := fmt.Sprintf("postgres://%s:%s@localhost:%s/%s?sslmode=disable",
 		postgresUser, postgresPassword, resource.GetPort("5432/tcp"), postgresDB)
 
+	log.Println("testutil: waiting until PostgreSQL accepts connections…")
 	var db *sql.DB
 	if err := pool.Retry(func() error {
 		var err error
@@ -67,11 +73,12 @@ func StartPostgres() (*sql.DB, func(), error) {
 	}
 
 	if err := CreateTestTables(db); err != nil {
-		db.Close()
+		_ = db.Close()
 		cleanup()
 		return nil, nil, fmt.Errorf("could not create test tables: %w", err)
 	}
 
+	log.Println("testutil: PostgreSQL is ready for tests")
 	return db, cleanup, nil
 }
 
@@ -90,6 +97,7 @@ func CreateTestTables(db *sql.DB) error {
 			id VARCHAR(255) PRIMARY KEY,
 			username VARCHAR(255) UNIQUE NOT NULL,
 			password VARCHAR(255) NOT NULL,
+			roles TEXT[] NOT NULL DEFAULT ARRAY['ROLE_USER']::TEXT[],
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE TABLE IF NOT EXISTS tokens (
