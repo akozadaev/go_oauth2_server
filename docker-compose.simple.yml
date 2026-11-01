@@ -16,7 +16,7 @@ services:
       REFRESH_EXPIRATION_HOURS: 168
       LOG_LEVEL: debug
     ports:
-      - "8080:8080"
+      - "8081:8080"
     networks:
       - oauth2-network
     depends_on:
@@ -31,7 +31,7 @@ services:
 
   # PostgreSQL
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: oauth2-postgres
     restart: unless-stopped
     environment:

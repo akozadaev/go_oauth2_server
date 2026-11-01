@@ -1,6 +1,6 @@
 # OAuth2 Server
 
-[![Go Version](https://img.shields.io/badge/Go-1.23.4-blue.svg)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.27.1-blue.svg)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](Dockerfile)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
@@ -8,7 +8,7 @@
 [![Grafana](https://img.shields.io/badge/Grafana-UI-blue.svg)](https://grafana.com/)
 [![Lint](https://github.com/akozadaev/go_oauth2_server/actions/workflows/lint.yml/badge.svg)](https://github.com/akozadaev/go_oauth2_server/actions/workflows/lint.yml)
 
-OAuth2 сервер на Go 1.23.4, на базе PostgreSQL с мониторингом Prometheus и Grafana
+OAuth2 сервер на Go 1.27.1, на базе PostgreSQL с мониторингом Prometheus и Grafana
 
 ## Возможности
 
