@@ -118,7 +118,7 @@ docker run -d \
     -e POSTGRES_USER=test_user \
     -e POSTGRES_PASSWORD=test_password \
     -p 5433:5432 \
-    postgres:15-alpine
+    postgres:18-alpine
 ```
 
 2. Установите переменную окружения:

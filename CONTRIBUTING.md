@@ -5,7 +5,7 @@
 ## 🚀 Начало работы
 
 ### Требования
-- Go 1.23.4+
+- Go 1.27.1+
 - Docker и Docker Compose
 - Git
 - **golangci-lint v2.8.0** (ставится через `make tools` или скрипт `install.sh` с тегом `v2.8.0`; версия совпадает с GitHub Actions)

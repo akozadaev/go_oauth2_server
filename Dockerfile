@@ -1,5 +1,5 @@
 # Multi-stage build
-FROM golang:1.23.4-alpine AS builder
+FROM golang:1.27.1-alpine AS builder
 
 # Устанавливаем необходимые пакеты
 RUN apk add --no-cache git ca-certificates tzdata
