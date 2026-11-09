@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # OAuth2 Server
   oauth2-server:
@@ -39,7 +37,7 @@ services:
       POSTGRES_USER: root
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
       - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5433:5432"
