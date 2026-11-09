@@ -7,6 +7,7 @@
 [![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-orange.svg)](https://prometheus.io/)
 [![Grafana](https://img.shields.io/badge/Grafana-UI-blue.svg)](https://grafana.com/)
 [![Lint](https://github.com/akozadaev/go_oauth2_server/actions/workflows/lint.yml/badge.svg)](https://github.com/akozadaev/go_oauth2_server/actions/workflows/lint.yml)
+[![Tests](https://github.com/akozadaev/go_oauth2_server/actions/workflows/tests.yml/badge.svg)](https://github.com/akozadaev/go_oauth2_server/actions/workflows/tests.yml)
 
 OAuth2 сервер на Go 1.27.1, на базе PostgreSQL с мониторингом Prometheus и Grafana
 
