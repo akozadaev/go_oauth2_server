@@ -34,10 +34,10 @@ func StartPostgres() (*sql.DB, func(), error) {
 		return nil, nil, fmt.Errorf("could not connect to Docker: %w", err)
 	}
 
-	log.Println("testutil: starting postgres:15-alpine (first run may take several minutes while the image is pulled)…")
+	log.Println("testutil: starting postgres:18-alpine (first run may take several minutes while the image is pulled)…")
 	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Repository: "postgres",
-		Tag:        "15-alpine",
+		Tag:        "18-alpine",
 		Env: []string{
 			"POSTGRES_USER=" + postgresUser,
 			"POSTGRES_PASSWORD=" + postgresPassword,

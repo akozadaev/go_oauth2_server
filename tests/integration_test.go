@@ -30,8 +30,8 @@ var integrationTestDB *sql.DB
 func TestMain(m *testing.M) {
 	db, cleanup, err := testutil.StartPostgres()
 	if err != nil {
-		log.Printf("Docker unavailable, skipping tests: %v", err)
-		os.Exit(0)
+		log.Printf("Failed to initialize test PostgreSQL: %v", err)
+		os.Exit(1)
 	}
 
 	integrationTestDB = db

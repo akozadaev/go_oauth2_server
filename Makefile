@@ -37,6 +37,7 @@ lint-full: ## 🧼 Полный линтинг с golangci-lint
 		echo "Installing golangci-lint..."; \
 		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v2.13.0; \
 	fi
+	golangci-lint config verify
 	golangci-lint run ./...
 
 lint-fix: ## 🧼 Автофиксы линтера
@@ -44,6 +45,7 @@ lint-fix: ## 🧼 Автофиксы линтера
 		echo "Installing golangci-lint..."; \
 		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin v2.13.0; \
 	fi
+	golangci-lint config verify
 	golangci-lint run --fix ./...
 
 check: fmt lint-full test ## 🧪 Финальная проверка перед коммитом
