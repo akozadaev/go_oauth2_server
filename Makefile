@@ -1,5 +1,7 @@
 # Makefile для OAuth2 сервера
-.PHONY: help tools generate build build-debug release fmt test test-coverage lint-full lint-fix check clean-all clean-deps clean-deps-safe fix-network vendor stop-conflicts docker-build docker-build-simple up up-simple up-no-build down logs logs-server logs-db status restart restart-server check-ports shell db-shell diagnose diagnose-container health doc quick-start quick-start-simple debug dev clean-tokens show-tokens count-tokens fix-perms test-unit test-integration test-docker test-docker-compose
+.PHONY: help tools generate build build-debug release fmt test test-coverage lint-full lint-fix check clean-all clean-deps clean-deps-safe deps-tidy deps-clean-cache deps-remove-vendor fix-network vendor stop-conflicts docker-build up up-no-build down logs logs-server logs-db status restart restart-server check-ports shell db-shell diagnose diagnose-container health doc quick-start debug dev clean-tokens show-tokens count-tokens fix-perms test-unit test-integration test-docker test-docker-compose
+
+.DEFAULT_GOAL := help
 
 # ==================== РАЗРАБОТКА ====================
 
@@ -33,14 +35,14 @@ test-coverage: ## 🧪 Покрытие тестами
 lint-full: ## 🧼 Полный линтинг с golangci-lint
 	@if ! [ -x "$$(command -v golangci-lint)" ]; then \
 		echo "Installing golangci-lint..."; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v2.8.0; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v2.13.0; \
 	fi
 	golangci-lint run ./...
 
 lint-fix: ## 🧼 Автофиксы линтера
 	@if ! [ -x "$$(command -v golangci-lint)" ]; then \
 		echo "Installing golangci-lint..."; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin v2.8.0; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin v2.13.0; \
 	fi
 	golangci-lint run --fix ./...
 
@@ -51,12 +53,20 @@ fix-network: ## 🌐 Исправление проблем с сетью
 	@chmod +x scripts/fix-network.sh
 	@./scripts/fix-network.sh
 
-clean-deps-safe: ## 🧹 Безопасная очистка зависимостей Go
-	@echo "🧹 Безопасная очистка зависимостей Go..."
-	@chmod +x scripts/clean-deps-safe.sh
+# Алиас оставлен для совместимости существующих команд.
+clean-deps: clean-deps-safe ## 📦 Загрузить и проверить зависимости
+
+clean-deps-safe: ## 📦 Загрузить и проверить зависимости без очистки
 	@./scripts/clean-deps-safe.sh
 
-clean-deps: clean-deps-safe ## 🧹 Очистка зависимостей Go (алиас для безопасной версии)
+deps-tidy: ## 📦 Актуализировать go.mod/go.sum и проверить зависимости
+	@./scripts/clean-deps-safe.sh --tidy
+
+deps-clean-cache: ## 🧹 Очистить кеш модулей, загрузить и проверить зависимости
+	@./scripts/clean-deps-safe.sh --clean-cache
+
+deps-remove-vendor: ## 🧹 Удалить vendor, загрузить и проверить зависимости
+	@./scripts/clean-deps-safe.sh --remove-vendor
 
 vendor: ## 📦 Создание vendor директории
 	@echo "📦 Создание vendor директории..."
@@ -68,7 +78,6 @@ vendor: ## 📦 Создание vendor директории
 clean-all: ## 🧹 Полная очистка Docker
 	@echo "🧹 Полная очистка Docker..."
 	-docker-compose down -v --remove-orphans 2>/dev/null || true
-	-docker-compose -f docker-compose.simple.yml down -v --remove-orphans 2>/dev/null || true
 	-docker container prune -f
 	-docker volume prune -f
 	-docker network prune -f
@@ -82,50 +91,29 @@ stop-conflicts: ## 🛑 Остановить конфликтующие проц
 	-docker rm $$(docker ps -aq --filter "name=oauth2") 2>/dev/null || true
 	@echo "✅ Конфликты устранены"
 
-docker-build: clean-all clean-deps ## 🔨 Собрать Docker образы заново
+docker-build: ## 🔨 Собрать Docker образы заново
 	@echo "🔨 Сборка Docker образов..."
 	docker-compose build --no-cache --force-rm
 	@echo "✅ Docker образы собраны"
-
-
-
-docker-build-simple: clean-all ## 🔨 Собрать простые Docker образы
-	@echo "🔨 Сборка простых Docker образов..."
-	docker-compose -f docker-compose.simple.yml build --no-cache --force-rm
-	@echo "✅ Простые Docker образы собраны"
 
 up: stop-conflicts docker-build ## 🚀 Запустить все сервисы
 	@echo "🚀 Запуск сервисов..."
 	docker-compose up -d
 	@echo "⏳ Ожидание готовности сервисов (60 секунд)..."
 	@sleep 60
-	@make status
+	@$(MAKE) status
 	@echo "✅ Сервисы запущены"
-
-
-
-up-simple: stop-conflicts docker-build-simple ## 🚀 Запустить простую версию
-	@echo "🚀 Запуск простой версии сервисов..."
-	docker-compose -f docker-compose.simple.yml up -d
-	@echo "⏳ Ожидание готовности сервисов (20 секунд)..."
-	@sleep 20
-	@echo "📋 Логи OAuth2 сервера:"
-	@docker-compose -f docker-compose.simple.yml logs oauth2-server
-	@echo ""
-	@echo "🔍 Проверка health endpoint:"
-	@curl -s http://localhost:8080/health || echo "❌ Health endpoint недоступен"
 
 up-no-build: stop-conflicts ## 🚀 Запустить без пересборки
 	@echo "🚀 Запуск сервисов без пересборки..."
 	docker-compose up -d
 	@echo "⏳ Ожидание готовности сервисов (60 секунд)..."
 	@sleep 60
-	@make status
+	@$(MAKE) status
 
 down: ## ⏹️ Остановить все сервисы
 	@echo "⏹️  Остановка сервисов..."
 	docker-compose down
-	docker-compose -f docker-compose.simple.yml down
 	@echo "✅ Сервисы остановлены"
 
 logs: ## 📋 Показать логи всех сервисов
@@ -176,8 +164,6 @@ diagnose-container: ## 🔍 Детальная диагностика конте
 	@chmod +x scripts/container-debug.sh
 	@./scripts/container-debug.sh
 
-
-
 health: ## 🏥 Проверить health endpoint
 	@echo "🏥 Проверка health endpoint:"
 	@curl -s http://localhost:8080/health | jq . || curl -s http://localhost:8080/health || echo "❌ Health endpoint недоступен"
@@ -219,38 +205,30 @@ count-tokens: ## 📈 Подсчет токенов
 quick-start: ## 🚀 Быстрый старт
 	@echo "🚀 Быстрый старт OAuth2 сервера..."
 	@if [ ! -f .env ]; then cp .env.example .env; echo "📝 Создан .env файл"; fi
-	@make up
+	@$(MAKE) up
 	@echo ""
 	@echo "✅ Сервер должен быть запущен!"
 	@echo "🔍 Запуск диагностики..."
-	@make diagnose
+	@$(MAKE) diagnose
 	@echo ""
 	@echo "🌐 Доступные URL:"
 	@echo "   OAuth2 Server: http://localhost:8080"
 	@echo "   Health Check:  http://localhost:8080/health"
 	@echo "   PostgreSQL:    localhost:5433"
 
-quick-start-simple: ## 🚀 Быстрый старт простой версии
-	@echo "🚀 Быстрый старт простой версии OAuth2 сервера..."
-	@make up-simple
-	@echo ""
-	@echo "🌐 Доступные URL:"
-	@echo "   OAuth2 Server: http://localhost:8080"
-	@echo "   PostgreSQL:    localhost:5433"
-
 debug: ## 🐛 Режим отладки
 	@echo "🐛 Запуск в режиме отладки..."
-	@make down
+	@$(MAKE) down
 	@LOG_LEVEL=debug docker-compose up --build
 
 dev: ## 👨‍💻 Режим разработки (локальная сборка + Docker БД)
 	@echo "👨‍💻 Запуск в режиме разработки..."
-	@make stop-conflicts
+	@$(MAKE) stop-conflicts
 	@docker-compose up -d postgres
 	@echo "⏳ Ожидание готовности БД..."
 	@sleep 10
 	@echo "🔨 Локальная сборка..."
-	@make build
+	@$(MAKE) build
 	@echo "🚀 Запуск локального сервера..."
 	@DATABASE_URL="postgres://oauth2_user:oauth2_password@localhost:5433/oauth2_db?sslmode=disable" \
 	 ./go_oauth2_server
@@ -264,24 +242,9 @@ fix-perms:
 	@echo "Права установлены."
 
 help: ## 📚 Показать справку
-	@echo "OAuth2 Server - Команды разработки и развертывания"
-	@echo ""
-	@echo "🔧 РАЗРАБОТКА:"
-	@grep -E '^[a-zA-Z_-]+:.*?## 🛠|^[a-zA-Z_-]+:.*?## 📦|^[a-zA-Z_-]+:.*?## ⚙️|^[a-zA-Z_-]+:.*?## 🧹|^[a-zA-Z_-]+:.*?## 🧪|^[a-zA-Z_-]+:.*?## 🧼|^[a-zA-Z_-]+:.*?## 🌐' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
-	@echo ""
-	@echo "🐳 DOCKER:"
-	@grep -E '^[a-zA-Z_-]+:.*?## 🧹|^[a-zA-Z_-]+:.*?## 🛑|^[a-zA-Z_-]+:.*?## 🔨|^[a-zA-Z_-]+:.*?## 🚀|^[a-zA-Z_-]+:.*?## ⏹️|^[a-zA-Z_-]+:.*?## 📋|^[a-zA-Z_-]+:.*?## 📊|^[a-zA-Z_-]+:.*?## 🔄|^[a-zA-Z_-]+:.*?## 🔌|^[a-zA-Z_-]+:.*?## 🐚|^[a-zA-Z_-]+:.*?## 🔍|^[a-zA-Z_-]+:.*?## 🏥' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
-	@echo ""
-	@echo "🔑 ТОКЕНЫ:"
-	@grep -E '^[a-zA-Z_-]+:.*?## 🧹|^[a-zA-Z_-]+:.*?## 📊|^[a-zA-Z_-]+:.*?## 📈' $(MAKEFILE_LIST) | grep -E 'tokens|clean-tokens|show-tokens|count-tokens' | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
-	@echo ""
-	@echo "⚡ БЫСТРЫЕ КОМАНДЫ:"
-	@grep -E '^[a-zA-Z_-]+:.*?## 🚀|^[a-zA-Z_-]+:.*?## 🐛|^[a-zA-Z_-]+:.*?## 👨‍💻|^[a-zA-Z_-]+:.*?## 📚' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
-	@echo ""
-	@echo "Примеры использования:"
-	@echo "  make show-tokens     # Показать активные токены"
-	@echo "  make clean-tokens    # Очистить истекшие токены"
-	@echo "  make count-tokens    # Статистика токенов"
+	@echo "OAuth2 Server — команды:"
+	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-24s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
 test-unit: ## 🧪 Запустить только unit тесты
 	go test -v ./internal/...
 
