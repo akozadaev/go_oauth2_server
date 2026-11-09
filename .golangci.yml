@@ -7,10 +7,10 @@ run:
   concurrency: 4
 
 issues:
-  exclude-files:
+  exclude.paths:
     - ".*.gen.go"
     - ".*_test.go"
-  exclude-dirs:
+  exclude.paths:
     - "migrations"
 
 output:
@@ -38,7 +38,7 @@ linters:
     #    - varcheck
     - depguard
 
-linters-settings:
+linters.settings:
   revive:
     severity: warning
     rules:
