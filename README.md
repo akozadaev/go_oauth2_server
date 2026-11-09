@@ -3,7 +3,7 @@
 [![Go Version](https://img.shields.io/badge/Go-1.27.1-blue.svg)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](Dockerfile)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-blue.svg)](https://www.postgresql.org/)
 [![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-orange.svg)](https://prometheus.io/)
 [![Grafana](https://img.shields.io/badge/Grafana-UI-blue.svg)](https://grafana.com/)
 [![Lint](https://github.com/akozadaev/go_oauth2_server/actions/workflows/lint.yml/badge.svg)](https://github.com/akozadaev/go_oauth2_server/actions/workflows/lint.yml)
@@ -40,7 +40,7 @@ cd go_oauth2_server
 
 ### 2. Запустите с помощью Docker Compose:
 ```bash
-# Быстрый запуск через docker-compose.simple.yml (OAuth2 + PostgreSQL + Adminer)
+# Быстрый запуск через основной Compose с профилем dev (OAuth2 + PostgreSQL + Adminer)
 ./scripts/quick-start.sh
 
 # Запуск с мониторингом (OAuth2 + PostgreSQL + Prometheus + Grafana)
@@ -106,6 +106,24 @@ go run ./cmd/server/main.go
 ```
 
 ## Docker команды
+
+[Шпаргалка Docker: запуск, масштабирование, тесты и диагностика](docs/docker-cheatsheet.md).
+
+### Конфигурации Docker Compose
+
+| Файл | Назначение | Что запускает |
+| --- | --- | --- |
+| [`docker-compose.yml`](docker-compose.yml) | Основной запуск | OAuth2-сервер и PostgreSQL. Через профили `monitoring` и `dev` — Prometheus, Grafana и Adminer |
+| [`docker-compose.scalable.yml`](docker-compose.scalable.yml) | Запуск нескольких экземпляров сервера | Через профиль `scalable` — Nginx как балансировщик, несколько OAuth2-серверов, PostgreSQL и мониторинг |
+| [`docker-compose.test.yml`](docker-compose.test.yml) | Выполнение тестов | Отдельную тестовую БД и контейнер, запускающий `go test` |
+
+`docker-compose.scalable.yml` — дополнение к основному файлу: используйте их вместе через `-f docker-compose.yml -f docker-compose.scalable.yml`. Требуется Docker Compose с поддержкой `!reset` (2.24.0+). Общие настройки приложения, БД и мониторинга наследуются из основного файла.
+
+По умолчанию команда `docker-compose` использует `docker-compose.yml`. Для другой конфигурации укажите `-f`, например:
+
+```bash
+docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from tests
+```
 
 ### Основные команды:
 ```bash
@@ -346,7 +364,6 @@ go_oauth2_server/
 ├── testutil/                   # Вспомогательные утилиты для тестов
 ├── scripts/                    # Скрипты запуска и обслуживания
 ├── docker-compose.yml          # Основной Compose (OAuth2 + PostgreSQL; мониторинг — профили)
-├── docker-compose.simple.yml   # Упрощённый стек
 ├── docker-compose.scalable.yml # Пример с Nginx и масштабированием
 ├── docker-compose.test.yml     # Тесты в контейнере
 ├── Dockerfile
@@ -507,11 +524,10 @@ go_oauth2_server/
 
 ```bash
 # Запуск с масштабированием (3 экземпляра)
-docker-compose --profile scalable -f docker-compose.scalable.yml up -d --scale oauth2-server=3
+docker-compose -f docker-compose.yml -f docker-compose.scalable.yml --profile scalable up -d --scale oauth2-server=3
 
-# Или используйте docker-compose scale
-docker-compose --profile scalable -f docker-compose.scalable.yml up -d
-docker-compose --profile scalable -f docker-compose.scalable.yml scale oauth2-server=3
+# По умолчанию запускаются три реплики:
+docker-compose -f docker-compose.yml -f docker-compose.scalable.yml --profile scalable up -d
 ```
 
 ### Ожидаемая производительность
@@ -533,3 +549,21 @@ MIT License - см. [LICENSE](LICENSE) для деталей.
 2. Запустите диагностику: `./scripts/diagnose.sh`
 3. Создайте issue в GitHub
 4. Обратитесь к документации в папке `docs/`
+
+## HTTPS в scalable
+
+Перед первым запуском создайте локальную пару сертификата и ключа:
+
+```bash
+bash scripts/setup-tls.sh
+docker-compose -f docker-compose.yml -f docker-compose.scalable.yml --profile scalable up -d --build
+curl -k https://localhost/health
+```
+
+Nginx принимает HTTPS на порту 443, HTTP на порту 80 перенаправляет на HTTPS
+с кодом 308, сохраняя метод запроса. Самоподписанный сертификат вызывает
+предупреждение браузера; `curl -k` используйте только для локальной проверки.
+Для публичного домена установите доверенный сертификат в `nginx/ssl/nginx.crt`
+и ключ в `nginx/ssl/nginx.key`, укажите домен в `server_name` и настройте
+продление сертификата. После замены сертификата перезагрузите Nginx.
+Каталог `nginx/ssl` исключён из Git. Скрипт не заменяет существующие файлы.

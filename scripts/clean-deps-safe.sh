@@ -1,42 +1,70 @@
 #!/bin/bash
 
-# Безопасная очистка зависимостей без root прав
+# Проверка зависимостей; изменения и очистка включаются явно.
+set -Eeuo pipefail
 
-set -e
+stage="инициализация"
+trap 'status=$?; printf "Ошибка на этапе: %s (код %s)\n" "$stage" "$status" >&2; exit "$status"' ERR
+fail() { printf 'Ошибка: %s\n' "$*" >&2; exit 1; }
+usage() {
+    cat <<'HELP'
+Использование: clean-deps-safe.sh [--tidy] [--clean-cache] [--remove-vendor]
+Без параметров: загрузить и проверить зависимости.
+  --tidy           Актуализировать go.mod и go.sum
+  --clean-cache    Очистить используемый кеш модулей перед загрузкой
+  --remove-vendor  Удалить vendor в корне проекта
+  --help           Показать справку
+Параметры можно комбинировать. GOMODCACHE берётся из окружения Go.
+HELP
+}
 
-echo "🧹 Безопасная очистка зависимостей Go..."
+tidy=false
+clean_cache=false
+remove_vendor=false
+for arg in "$@"; do
+    case "$arg" in
+        --tidy) tidy=true ;;
+        --clean-cache) clean_cache=true ;;
+        --remove-vendor) remove_vendor=true ;;
+        --help|-h) usage; exit 0 ;;
+        *) usage >&2; fail "Неизвестный параметр: $arg" ;;
+    esac
+done
 
-# Удаляем vendor если есть
-if [ -d "vendor" ]; then
-    echo "🗑️  Удаление vendor директории..."
-    rm -rf vendor/
-fi
+command -v go >/dev/null 2>&1 || fail "Команда go не найдена в PATH"
+project_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+cd -- "$project_root"
+[[ -f go.mod ]] || fail "Не найден $project_root/go.mod"
+# Запись нужна также go mod download, если требуется дополнить go.sum.
+[[ -w . ]] || fail "Нет прав записи в $project_root"
+for manifest in go.mod go.sum; do
+    if [[ -e "$manifest" && ! -w "$manifest" ]]; then
+        fail "Нет прав записи в $manifest"
+    fi
+done
 
-# Проверяем права на кеш модулей
-MODCACHE=$(go env GOMODCACHE)
-if [ -w "$MODCACHE" ] 2>/dev/null; then
-    echo "🧹 Очистка модульного кеша..."
+stage="проверка кеша модулей"
+modcache="$(go env GOMODCACHE)"
+[[ -n "$modcache" && "$modcache" == /* && "$modcache" != / ]] || fail "Некорректный GOMODCACHE: $modcache"
+mkdir -p -- "$modcache"
+probe="$(mktemp "$modcache/.write-check.XXXXXXXX")"
+rm -- "$probe"
+
+if "$clean_cache"; then
+    stage="очистка кеша модулей"
+    printf 'Очистка кеша модулей: %s\n' "$modcache"
     go clean -modcache
-else
-    echo "⚠️  Нет прав для очистки глобального кеша модулей"
-    echo "💡 Используем локальную очистку..."
-
-    # Создаем временный GOMODCACHE в проекте
-    export GOMODCACHE="$(pwd)/.modcache"
-    mkdir -p "$GOMODCACHE"
-    echo "📁 Создан локальный кеш модулей: $GOMODCACHE"
 fi
-
-# Обновляем go.mod и go.sum
-echo "📦 Обновление зависимостей..."
-go mod tidy
-
-# Проверяем зависимости
-echo "🔍 Проверка зависимостей..."
-go mod verify || echo "⚠️  Некоторые зависимости могут быть недоступны"
-
-# Пробуем загрузить зависимости
-echo "⬇️  Загрузка зависимостей..."
-go mod download || echo "⚠️  Некоторые зависимости не удалось загрузить"
-
-echo "✅ Безопасная очистка завершена!"
+if "$remove_vendor"; then
+    stage="удаление vendor"
+    rm -rf -- "$project_root/vendor"
+fi
+if "$tidy"; then
+    stage="актуализация go.mod и go.sum"
+    go mod tidy
+fi
+stage="загрузка модулей"
+go mod download
+stage="проверка модулей"
+go mod verify
+printf 'Зависимости загружены и проверены.\n'
