@@ -13,16 +13,7 @@ if [ ! -f .env ]; then
     echo "✅ .env файл создан. Отредактируйте его перед запуском!"
 fi
 
-# Создание SSL сертификатов для nginx
-if [ ! -d nginx/ssl ]; then
-    echo "🔐 Создание SSL сертификатов..."
-    mkdir -p nginx/ssl
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-        -keyout nginx/ssl/nginx.key \
-        -out nginx/ssl/nginx.crt \
-        -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost"
-    echo "✅ SSL сертификаты созданы"
-fi
+bash scripts/setup-tls.sh
 
 # Сборка образов
 echo "🔨 Сборка Docker образов..."
@@ -32,8 +23,8 @@ echo "✅ Настройка завершена!"
 echo ""
 echo "Для запуска выполните:"
 echo "  make up          # Обычный запуск"
-echo "  make up-dev      # Режим разработки"
-echo "  make monitoring  # С мониторингом"
+echo "  docker-compose --profile dev up -d  # С Adminer"
+echo "  docker-compose --profile monitoring up -d  # С мониторингом"
 echo ""
 echo "Полезные команды:"
 echo "  make logs        # Просмотр логов"

@@ -20,7 +20,7 @@ echo ""
 
 # Останавливаем конфликтующие контейнеры
 echo "🛑 Остановка конфликтующих контейнеров..."
-docker-compose -f docker-compose.simple.yml down --remove-orphans 2>/dev/null || true
+docker-compose --profile dev down --remove-orphans 2>/dev/null || true
 docker stop oauth2-server oauth2-postgres oauth2-adminer 2>/dev/null || true
 docker rm oauth2-server oauth2-postgres oauth2-adminer 2>/dev/null || true
 echo "✅ Конфликтующие контейнеры остановлены"
@@ -28,18 +28,18 @@ echo ""
 
 # Очищаем старые образы (автоматически, без интерактивного запроса)
 echo "🧹 Очистка старых образов..."
-docker-compose -f docker-compose.simple.yml build --no-cache
+docker-compose --profile dev build --no-cache
 
 # Запускаем сервисы
 echo "🐳 Запуск сервисов..."
-docker-compose -f docker-compose.simple.yml up -d
+docker-compose --profile dev up -d
 
 echo "⏳ Ожидание готовности сервисов..."
 sleep 30
 
 # Проверяем статус контейнеров
 echo "📊 Статус контейнеров:"
-docker-compose -f docker-compose.simple.yml ps
+docker-compose --profile dev ps
 
 echo ""
 echo "🔍 Проверка подключений..."
@@ -51,7 +51,7 @@ if nc -z localhost 5433; then
 else
     echo "❌ Недоступен"
     echo "📋 Логи PostgreSQL:"
-    docker-compose -f docker-compose.simple.yml logs postgres
+    docker-compose --profile dev logs postgres
     exit 1
 fi
 
@@ -62,7 +62,7 @@ if nc -z localhost 8080; then
 else
     echo "❌ Недоступен"
     echo "📋 Логи OAuth2 Server:"
-    docker-compose -f docker-compose.simple.yml logs oauth2-server
+    docker-compose --profile dev logs oauth2-server
     exit 1
 fi
 
@@ -73,7 +73,7 @@ if curl -s http://localhost:8080/health > /dev/null; then
 else
     echo "❌ Health endpoint не работает"
     echo "📋 Логи OAuth2 Server:"
-    docker-compose -f docker-compose.simple.yml logs oauth2-server
+    docker-compose --profile dev logs oauth2-server
     exit 1
 fi
 
@@ -84,7 +84,7 @@ if nc -z localhost 8081; then
 else
     echo "❌ Недоступен"
     echo "📋 Логи Adminer:"
-    docker-compose -f docker-compose.simple.yml logs adminer
+    docker-compose --profile dev logs adminer
 fi
 
 echo ""
@@ -97,10 +97,10 @@ echo "   PostgreSQL:    localhost:5433"
 echo "   Adminer:       http://localhost:8081"
 echo ""
 echo "📚 Полезные команды:"
-echo "   docker-compose -f docker-compose.simple.yml logs        - просмотр логов"
-echo "   docker-compose -f docker-compose.simple.yml ps          - статус контейнеров"
-echo "   docker-compose -f docker-compose.simple.yml down        - остановка сервисов"
-echo "   docker-compose -f docker-compose.simple.yml restart     - перезапуск сервисов"
+echo "   docker-compose --profile dev logs        - просмотр логов"
+echo "   docker-compose --profile dev ps          - статус контейнеров"
+echo "   docker-compose --profile dev down        - остановка сервисов"
+echo "   docker-compose --profile dev restart     - перезапуск сервисов"
 echo ""
 echo "🔧 Для диагностики проблем:"
 echo "   ./scripts/diagnose.sh"

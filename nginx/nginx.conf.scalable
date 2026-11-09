@@ -10,14 +10,9 @@ http {
     # Upstream для балансировки нагрузки между несколькими экземплярами
     upstream oauth2_backend {
         least_conn;  # Балансировка по наименьшему количеству соединений
-        # Для production добавьте несколько серверов:
-        server oauth2-server-1:8080 max_fails=3 fail_timeout=30s;
-        server oauth2-server-2:8080 max_fails=3 fail_timeout=30s;
-        server oauth2-server-3:8080 max_fails=3 fail_timeout=30s;
-        
-        # Для Docker Compose с одним сервисом (с несколькими репликами):
-        # server oauth2-server:8080 max_fails=3 fail_timeout=30s;
-        
+        # Docker DNS возвращает адреса реплик сервиса.
+        server oauth2-server:8080 max_fails=3 fail_timeout=30s;
+
         keepalive 32;  # Keep-alive соединения для upstream
     }
 
@@ -42,6 +37,14 @@ http {
     server {
         listen 80;
         server_name localhost;
+        return 308 https://$host$request_uri;
+    }
+
+    server {
+        listen 443 ssl;
+        server_name localhost;
+        ssl_certificate /etc/nginx/ssl/nginx.crt;
+        ssl_certificate_key /etc/nginx/ssl/nginx.key;
 
         # Увеличиваем размеры буферов для высокой нагрузки
         client_body_buffer_size 128k;
