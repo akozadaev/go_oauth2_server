@@ -10,6 +10,8 @@
 
 OAuth2 сервер на Go 1.27.1, на базе PostgreSQL с мониторингом Prometheus и Grafana
 
+История версий: [CHANGELOG.md](CHANGELOG.md).
+
 ## Возможности
 
 - Authorization Code Grant
