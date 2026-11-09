@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	_ "go_oauth2_server/docs" // Регистрирует сгенерированную Swagger-спецификацию.
 	"go_oauth2_server/internal/config"
 	"go_oauth2_server/internal/handlers"
 	"go_oauth2_server/internal/storage"
@@ -27,6 +28,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
 var (
@@ -146,6 +148,7 @@ func run() error {
 
 	// Routes
 	router.Route("/", func(r chi.Router) {
+		registerSwagger(r)
 		r.HandleFunc("/authorize", h.Authorize)
 		r.HandleFunc("/token", h.Token)
 		r.HandleFunc("/introspect", h.Introspect)
@@ -289,4 +292,8 @@ type responseWriter struct {
 func (rw *responseWriter) WriteHeader(code int) {
 	rw.statusCode = code
 	rw.ResponseWriter.WriteHeader(code)
+}
+
+func registerSwagger(router chi.Router) {
+	router.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL("doc.json")))
 }

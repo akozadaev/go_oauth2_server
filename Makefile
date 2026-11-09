@@ -1,5 +1,5 @@
 # Makefile для OAuth2 сервера
-.PHONY: help tools generate build build-debug release fmt test test-coverage lint-full lint-fix check clean-all clean-deps clean-deps-safe deps-tidy deps-clean-cache deps-remove-vendor fix-network vendor stop-conflicts docker-build up up-no-build down logs logs-server logs-db status restart restart-server check-ports shell db-shell diagnose diagnose-container health doc quick-start debug dev clean-tokens show-tokens count-tokens fix-perms test-unit test-integration test-docker test-docker-compose
+.PHONY: help tools generate build build-debug release fmt test test-coverage lint-full lint-fix check clean-all clean-deps clean-deps-safe deps-tidy deps-clean-cache deps-remove-vendor fix-network vendor stop-conflicts docker-build up up-no-build down logs logs-server logs-db status restart restart-server check-ports shell db-shell diagnose diagnose-container health doc quick-start debug dev air-install clean-tokens show-tokens count-tokens fix-perms test-unit test-integration test-docker test-docker-compose
 
 .DEFAULT_GOAL := help
 
@@ -223,17 +223,16 @@ debug: ## 🐛 Режим отладки
 	@$(MAKE) down
 	@LOG_LEVEL=debug docker-compose up --build
 
-dev: ## 👨‍💻 Режим разработки (локальная сборка + Docker БД)
-	@echo "👨‍💻 Запуск в режиме разработки..."
-	@$(MAKE) stop-conflicts
-	@docker-compose up -d postgres
-	@echo "⏳ Ожидание готовности БД..."
-	@sleep 10
-	@echo "🔨 Локальная сборка..."
-	@$(MAKE) build
-	@echo "🚀 Запуск локального сервера..."
+air-install: ## 🛠 Установить Air для горячего перезапуска
+	go install github.com/air-verse/air@latest
+
+dev: ## 👨‍💻 Локальный сервер с Air и PostgreSQL в Docker
+	@command -v air >/dev/null 2>&1 || { echo "Установите Air: make air-install; добавьте Go bin в PATH"; exit 1; }
+	@docker-compose stop oauth2-server
+	@docker-compose up -d --wait --wait-timeout 90 postgres
+	@echo "🚀 Air: перезапуск сервера при изменении исходников (Ctrl+C — выход)"
 	@DATABASE_URL="postgres://oauth2_user:oauth2_password@localhost:5433/oauth2_db?sslmode=disable" \
-	 ./go_oauth2_server
+	 air -c .air.toml
 
 fix-perms:
 	@echo "Установка прав доступа для папок и фалов кода..."
